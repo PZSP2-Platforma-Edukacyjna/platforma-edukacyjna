@@ -1,0 +1,119 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+' ===== KLASY =====
+
+class Uzytkownik {
+  id_uzytkownik : int
+  email : string
+  haslo : string
+  imie : string
+  nazwisko : string
+}
+
+class Rodzic
+class Nauczyciel
+class Admin
+
+class Uczen {
+  id_uczen : int
+  pesel : string
+  imie : string
+  nazwisko : string
+  data_urodzenia : date
+}
+
+class Kurs {
+  id_kurs : int
+  nazwa : string
+  opis : string
+}
+
+class Lekcja {
+  id_lekcja : int
+  temat : string
+  data : datetime
+}
+
+class Material {
+  id_material : int
+  nazwa : string
+  link : string
+}
+
+class Obecnosc {
+  id_obecnosc : int
+  status : StatusObecnosci
+}
+
+class Platnosc {
+  id_platnosc : int
+  kwota : decimal
+  data : date
+  status : StatusPlatnosci
+}
+
+class Wiadomosc {
+  id_wiadomosc : int
+  temat : string
+  tresc : string
+  data : datetime
+  status : StatusWiadomosci
+}
+
+class Aktualnosc {
+  id_aktualnosc : int
+  temat : string
+  tresc : string
+  data : datetime
+  grafika_sciezka : string
+}
+
+' ===== ENUMY =====
+
+enum StatusObecnosci {
+  OBECNY
+  NIEOBECNY_NIEUSPRAWIEDLIWIONY
+  NIEOBECNY_USPRAWIEDLIWIONY
+}
+
+enum StatusPlatnosci {
+  OPLACONA
+  NIEOPLACONA
+}
+
+enum StatusWiadomosci {
+  PRZECZYTANE
+  NIEPRZECZYTANE
+}
+
+' ===== DZIEDZICZENIE =====
+
+Rodzic --|> Uzytkownik
+Nauczyciel --|> Uzytkownik
+Admin --|> Uzytkownik
+
+' ===== RELACJE =====
+
+Rodzic "1" -- "0..*" Uczen
+
+Nauczyciel "1" -- "0..*" Kurs
+
+Kurs "1" -- "0..*" Lekcja
+
+Lekcja "1" -- "0..*" Material
+
+Uczen "1" -- "0..*" Obecnosc
+Lekcja "1" -- "0..*" Obecnosc
+
+Rodzic "1" -- "0..*" Platnosc
+Kurs "1" -- "0..*" Platnosc
+
+Uczen "0..*" -- "0..*" Kurs
+
+Uzytkownik "1" -- "0..*" Wiadomosc : nadawca
+Uzytkownik "1" -- "0..*" Wiadomosc : adresat
+
+Nauczyciel "1" -- "0..*" Aktualnosc
+
+@enduml

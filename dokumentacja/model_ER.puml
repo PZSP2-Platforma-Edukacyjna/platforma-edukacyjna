@@ -1,0 +1,135 @@
+@startuml
+hide circle
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #F9F9F9
+  BorderColor black
+}
+
+entity "UZYTKOWNIK" as UZYTKOWNIK {
+  +id_uzytkownik : int <<PK>>
+  --
+  email : string <<UNIQUE, NOT NULL>>
+  haslo : string <<NOT NULL>>
+  imie  : string <<NOT NULL>>
+  nazwisko : string <<NOT NULL>>
+}
+
+entity "RODZIC" as RODZIC {
+  +id_rodzic : int <<PK, FK>>
+}
+
+entity "NAUCZYCIEL" as NAUCZYCIEL {
+  +id_nauczyciel : int <<PK, FK>>
+}
+
+entity "ADMIN" as ADMIN {
+  +id_admin : int <<PK, FK>>
+}
+
+entity "UCZEN" as UCZEN {
+  +id_uczen : int <<PK>>
+  --
+  pesel : string <<UNIQUE, NOT NULL>>
+  imie : string <<NOT NULL>>
+  nazwisko : string <<NOT NULL>>
+  data_urodzenia : date <<NOT NULL>>
+  id_rodzic : int <<FK, NOT NULL>>
+}
+
+entity "KURS" as KURS {
+  +id_kurs : int <<PK>>
+  --
+  nazwa : string <<NOT NULL>>
+  opis : string
+  id_nauczyciel : int <<FK, NOT NULL>>
+}
+
+entity "LEKCJA" as LEKCJA {
+  +id_lekcja : int <<PK>>
+  --
+  temat : string <<NOT NULL>>
+  data : datetime <<NOT NULL>>
+  id_kurs : int <<FK, NOT NULL>>
+}
+
+entity "MATERIAL" as MATERIAL {
+  +id_material : int <<PK>>
+  --
+  nazwa : string <<NOT NULL>>
+  link : string <<UNIQUE, NOT NULL>>
+  id_lekcja : int <<FK, NOT NULL>>
+}
+
+entity "OBECNOSC" as OBECNOSC {
+  +id_obecnosc : int <<PK>>
+  --
+  status : enum (OBECNY, NIEOBECNY_NIEUSPRAWIEDLIWIONY, NIEOBECNY_USPRAWIEDLIWIONY <<NOT NULL>>
+  id_uczen : int <<FK, NOT NULL>>
+  id_lekcja : int <<FK, NOT NULL>>
+}
+
+entity "PLATNOSC" as PLATNOSC {
+  +id_platnosc : int <<PK>>
+  --
+  kwota : decimal(10,2) <<NOT NULL>>
+  data : date <<NOT NULL>>
+  status : enum (OPLACONA, NIEOPLACONA) <<NOT NULL>>
+  id_rodzic : int <<FK, NOT NULL>>
+  id_kurs : int <<FK, NOT NULL>>
+}
+
+entity "WIADOMOSC" as WIADOMOSC {
+  +id_wiadomosc : int <<PK>>
+  --
+  temat : string <<NOT NULL>>
+  tresc : string <<NOT NULL>>
+  data : datetime <<NOT NULL>>
+  przeczytane : bool <<NOT NULL>>
+  id_nadawca : int <<FK, NOT NULL>>
+  id_adresat : int <<FK, NOT NULL>>
+}
+
+entity "AKTUALNOSC" as AKTUALNOSC {
+  +id_aktualnosc : int <<PK>>
+  --
+  temat : string <<NOT NULL>>
+  tresc : string <<NOT NULL>>
+  data : datetime <<NOT NULL>>
+  grafika_sciezka : string
+  id_autor : int <<FK, NOT NULL>>
+}
+
+entity "UCZEN_KURS" as UCZEN_KURS {
+  +id_uczen : int <<PK, FK>>
+  +id_kurs : int <<PK, FK>>
+}
+
+' ===== RELACJE =====
+
+UZYTKOWNIK ||--|| RODZIC
+UZYTKOWNIK ||--|| NAUCZYCIEL
+UZYTKOWNIK ||--|| ADMIN
+
+RODZIC ||--o{ UCZEN
+
+NAUCZYCIEL ||--o{ KURS
+
+KURS ||--o{ LEKCJA
+
+LEKCJA ||--o{ MATERIAL
+
+UCZEN ||--o{ OBECNOSC
+LEKCJA ||--o{ OBECNOSC
+
+RODZIC ||--o{ PLATNOSC
+KURS ||--o{ PLATNOSC
+
+UCZEN ||--o{ UCZEN_KURS
+KURS ||--o{ UCZEN_KURS
+
+UZYTKOWNIK ||--o{ WIADOMOSC : nadawca
+UZYTKOWNIK ||--o{ WIADOMOSC : odbiorca
+
+NAUCZYCIEL ||--o{ AKTUALNOSC
+@enduml
