@@ -10,6 +10,7 @@
       perSystem = { pkgs, ... }: let
         python = pkgs.python314.withPackages(ps: with ps; [
           django_6
+          (djangorestframework.override { django = django_6; })
         ]);
       in {
         devShells.default = pkgs.mkShell {
