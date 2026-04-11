@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function Home() {
-  return <h1>Platforma edukacyjna</h1>;
+  redirect("/dashboard");
 }
