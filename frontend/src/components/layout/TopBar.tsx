@@ -5,14 +5,14 @@ export default function TopBar() {
         {["Jan Kowalski", "Anna Kowalska"].map((child, i) => (
           <div
             key={i}
-            className="border rounded p-2 px-4 cursor-pointer hover:bg-gray-100"
+            className="btn"
           >
             {child}
           </div>
         ))}
       </div>
 
-      <div className="border rounded px-4 py-2">Konto</div>
+      <div className="btn">Konto</div>
     </div>
   );
 }
