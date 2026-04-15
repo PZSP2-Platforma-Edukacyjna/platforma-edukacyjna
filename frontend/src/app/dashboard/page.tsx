@@ -13,7 +13,7 @@ export default function Dashboard() {
         {/* LEWA */}
         <div className="flex flex-col flex-[4] gap-4">
           {/* PLAN */}
-          <div className="flex-[2] border rounded p-2 overflow-auto">
+          <div className="card flex-[2] overflow-auto">
             <ScheduleGrid />
           </div>
 

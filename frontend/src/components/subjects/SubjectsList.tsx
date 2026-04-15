@@ -13,11 +13,11 @@ export default function SubjectsList() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-white border rounded p-2">
+    <div className="card h-full overflow-y-auto bg-white">
       {subjects.map((s, i) => (
         <div
           key={i}
-          className="mb-3 p-3 border rounded h-20 flex flex-col justify-center cursor-pointer hover:bg-gray-100"
+          className="card mb-3 h-20 flex flex-col justify-center"
         >
           <div className="font-semibold">{s.name}</div>
           <div className="text-xs text-gray-500">{s.teacher}</div>
