@@ -27,7 +27,7 @@ export default function TopBar() {
       setError(null);
       try {
         const token = getAccessToken();
-        const response = await fetch("http://localhost:8000/api/my-children/", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
