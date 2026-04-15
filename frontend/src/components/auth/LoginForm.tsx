@@ -1,20 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { login } from "@/lib/auth";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO
-    console.log("Email:", email);
-    console.log("Password:", password);
+    setError(null);
+
+    const success = await login(email, password);
+    if (success) {
+      router.push("/dashboard");
+    } else {
+      setError("Nieprawidłowy adres email lub hasło.");
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && <p className="text-red-500 text-sm text-center">{error}</p>}
       <div>
         <label
           htmlFor="email"
