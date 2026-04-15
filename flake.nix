@@ -8,9 +8,16 @@
     flake-parts.lib.mkFlake { inherit inputs; } ({ ... }: {
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       perSystem = { pkgs, ... }: let
-        python = pkgs.python314.withPackages(ps: with ps; [
-          django_6
-          (djangorestframework.override { django = django_6; })
+        python = pkgs.python314.withPackages(ps: let
+          django = ps.django_6;
+          djangorestframework = ps.djangorestframework.override { inherit django; };
+        in [
+          django
+          djangorestframework
+          (ps.djangorestframework-simplejwt.override {
+            inherit django djangorestframework;
+          })
+          (ps.django-cors-headers.override { inherit django; })
         ]);
       in {
         devShells.default = pkgs.mkShell {
