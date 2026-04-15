@@ -17,6 +17,10 @@
           packages = [
             python
             pkgs.pyright
+
+            pkgs.nodejs_25
+            pkgs.typescript-language-server
+            pkgs.eslint
           ];
         };
       };
