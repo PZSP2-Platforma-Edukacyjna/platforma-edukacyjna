@@ -76,11 +76,11 @@ class Command(BaseCommand):
         self.stdout.write(f'Created 10 parents with a total of {len(all_students)} students and assigned to Parent group.')
 
         all_courses = []
-        course_names = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Art', 'Music', 'Physical Education', 'Computer Science']
+        course_names = ['Matematyka', 'Fizyka', 'Chemia', 'Biologia', 'Historia', 'Geografia', 'Sztuka', 'Muzyka', 'Wychowanie fizyczne', 'Informatyka']
         for i, teacher in enumerate(teachers):
             num_courses = random.randint(1, 2)
             for j in range(num_courses):
-                course_name = f'{random.choice(course_names)} {101 + i}'
+                course_name = random.choice(course_names)
                 course = Course.objects.create(
                     teacher=teacher,
                     name=course_name,
@@ -88,11 +88,17 @@ class Command(BaseCommand):
                 )
                 all_courses.append(course)
 
-                for k in range(5):
+                for k in range(random.randint(5, 10)):
+                    days_to_add = random.randint(0, 4)
+                    new_date = timezone.now() + datetime.timedelta(days=days_to_add)
+                    # if the new date is a weekend, add 2 days to move it to monday
+                    if new_date.weekday() > 4:
+                        new_date += datetime.timedelta(days=2)
+
                     Lesson.objects.create(
                         course=course,
                         topic=f'Lesson {k+1}: {course_name}',
-                        date=timezone.now() + datetime.timedelta(days=k*7)
+                        date=new_date.replace(hour=random.randint(8, 16), minute=0, second=0, microsecond=0)
                     )
         self.stdout.write(f'Created {len(all_courses)} courses with lessons.')
 
