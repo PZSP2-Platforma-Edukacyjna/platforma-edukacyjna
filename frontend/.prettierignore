@@ -1,0 +1,16 @@
+# Ignore artifacts:
+build
+.next
+out
+
+# Ignore solutions:
+solution
+
+# Ignore dist:
+dist
+
+# Ignore editor config:
+.vscode
+
+# Ignore modules:
+node_modules
