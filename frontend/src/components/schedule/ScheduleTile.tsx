@@ -10,11 +10,7 @@ export default function ScheduleTile({ subject, teacher, status }: Props) {
   }
 
   const color =
-    status === "present"
-      ? "bg-green-500"
-      : status === "absent"
-      ? "bg-red-500"
-      : "bg-yellow-500";
+    status === "present" ? "bg-green-500" : status === "absent" ? "bg-red-500" : "bg-yellow-500";
 
   return (
     <div className="flex border h-16 bg-white">

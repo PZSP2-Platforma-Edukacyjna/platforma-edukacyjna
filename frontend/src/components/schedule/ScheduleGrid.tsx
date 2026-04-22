@@ -12,8 +12,8 @@ export type Schedule = Record<string, Record<number, Lesson>>;
 const days = ["Pon", "Wt", "Śr", "Czw", "Pt"];
 
 type Props = {
-    schedule: Schedule;
-}
+  schedule: Schedule;
+};
 
 export default function ScheduleGrid({ schedule }: Props) {
   const hours = Array.from({ length: 10 }, (_, i) => 8 + i);
@@ -31,9 +31,7 @@ export default function ScheduleGrid({ schedule }: Props) {
 
       {hours.map((hour) => (
         <React.Fragment key={hour}>
-          <div className="text-right pr-2">
-            {hour}:00
-          </div>
+          <div className="text-right pr-2">{hour}:00</div>
 
           {days.map((day) => {
             const lesson = schedule[day]?.[hour];
