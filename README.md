@@ -21,7 +21,7 @@ Zależności:
 Należy wykonać:
 ```bash
 cd backend \
-    && pip isntall --no-cache-dir -r requirements.txt
+    && pip install -r requirements.txt
     && python manage.py seed_data # dla przykładowych danych
     && python manage.py runserver
 ```
