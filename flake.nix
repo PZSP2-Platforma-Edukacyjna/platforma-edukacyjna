@@ -11,6 +11,7 @@
         python = pkgs.python314.withPackages(ps: let
           django = ps.django_6;
           djangorestframework = ps.djangorestframework.override { inherit django; };
+          dj-database-url = ps.dj-database-url.override { inherit django; };
         in [
           django
           djangorestframework
@@ -18,6 +19,7 @@
             inherit django djangorestframework;
           })
           (ps.django-cors-headers.override { inherit django; })
+          dj-database-url
         ]);
       in {
         devShells.default = pkgs.mkShell {
