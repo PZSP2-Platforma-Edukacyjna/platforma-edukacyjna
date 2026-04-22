@@ -8,11 +8,7 @@ type Props = {
   onSelectChild: (child: Child) => void;
 };
 
-export default function TopBar({
-  childList,
-  selectedChild,
-  onSelectChild,
-}: Props) {
+export default function TopBar({ childList, selectedChild, onSelectChild }: Props) {
   return (
     <div className="flex justify-between items-center p-4 border-b bg-white">
       <div className="flex gap-3">

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import TopBar from "@/components/layout/TopBar";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import SubjectsList from "@/components/subjects/SubjectsList";
@@ -18,7 +18,7 @@ type Teacher = {
   id: number;
   first_name: string;
   last_name: string;
-}
+};
 
 type Lesson = {
   id: number;
@@ -42,7 +42,7 @@ const dayMapping: Record<number, string> = {
 function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher[]): Schedule {
   const schedule: Schedule = {};
 
-  const filteredLessons = lessons.filter(lesson => courses.includes(lesson.course));
+  const filteredLessons = lessons.filter((lesson) => courses.includes(lesson.course));
 
   filteredLessons.forEach((lesson) => {
     const date = new Date(lesson.date);
@@ -53,7 +53,7 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
       schedule[day] = {};
     }
 
-    const teacher = teachers.find(t => t.id === lesson.teacher);
+    const teacher = teachers.find((t) => t.id === lesson.teacher);
 
     schedule[day][hour] = {
       subject: lesson.course_name,
@@ -118,8 +118,6 @@ export default function Dashboard() {
     getData();
   }, []);
 
-
-
   const handleSelectChild = (child: Child) => {
     setSelectedChild(child);
     const newSchedule = processSchedule(lessons, child.enrolled_courses, teachers);
@@ -128,39 +126,39 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col">
-    <TopBar
-    childList={children}
-    selectedChild={selectedChild}
-    onSelectChild={handleSelectChild}
-    />
+      <TopBar
+        childList={children}
+        selectedChild={selectedChild}
+        onSelectChild={handleSelectChild}
+      />
 
-    <div className="flex flex-1 gap-4 p-4">
-    {/* LEWA */}
-    <div className="flex flex-col flex-[4] gap-4">
-    {/* PLAN */}
-    <div className="card flex-[2] overflow-auto">
-    {loading && <div>Loading...</div>}
-    {error && <div>Error: {error}</div>}
-    {!loading && !error && <ScheduleGrid schedule={schedule} />}
-    </div>
+      <div className="flex flex-1 gap-4 p-4">
+        {/* LEWA */}
+        <div className="flex flex-col flex-[4] gap-4">
+          {/* PLAN */}
+          <div className="card flex-[2] overflow-auto">
+            {loading && <div>Loading...</div>}
+            {error && <div>Error: {error}</div>}
+            {!loading && !error && <ScheduleGrid schedule={schedule} />}
+          </div>
 
-    {/* DÓŁ */}
-    <div className="flex flex-[1] gap-4">
-    <div className="flex-1">
-    <NewsList />
-    </div>
+          {/* DÓŁ */}
+          <div className="flex flex-[1] gap-4">
+            <div className="flex-1">
+              <NewsList />
+            </div>
 
-    <div className="flex-1">
-    <MessagesList />
-    </div>
-    </div>
-    </div>
+            <div className="flex-1">
+              <MessagesList />
+            </div>
+          </div>
+        </div>
 
-    {/* PRAWA */}
-    <div className="flex-[1] max-w-[20%]">
-    <SubjectsList />
-    </div>
-    </div>
+        {/* PRAWA */}
+        <div className="flex-[1] max-w-[20%]">
+          <SubjectsList />
+        </div>
+      </div>
     </div>
   );
 }
