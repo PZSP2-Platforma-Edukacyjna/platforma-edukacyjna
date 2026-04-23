@@ -1,5 +1,21 @@
 from rest_framework import serializers
-from .models import Student, Lesson
+from .models import Student, Lesson, Course, LearningMaterial
+
+class LearningMaterialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearningMaterial
+        fields = ['id', 'title', 'description', 'url']
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ['id', 'course_code', 'name', 'description', 'teacher']
+
+class CourseDetailSerializer(CourseSerializer):
+    learning_materials = LearningMaterialSerializer(many=True, read_only=True)
+
+    class Meta(CourseSerializer.Meta):
+        fields = list(CourseSerializer.Meta.fields) + ['learning_materials']
 
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
