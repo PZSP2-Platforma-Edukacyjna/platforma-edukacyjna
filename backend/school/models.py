@@ -13,8 +13,9 @@ class Student(models.Model):
 
 class Course(models.Model):
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='courses_taught', limit_choices_to={'role': User.Role.TEACHER})
+    course_code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=200)
-    description = models.TextField()
+    description = models.TextField(blank=True)
     students = models.ManyToManyField('Student', related_name='enrolled_courses', blank=True)
 
     def __str__(self) -> str:
@@ -27,3 +28,12 @@ class Lesson(models.Model):
 
     def __str__(self) -> str:
         return str(self.topic)
+
+class LearningMaterial(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='learning_materials')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    url = models.URLField()
+
+    def __str__(self) -> str:
+        return str(self.title)

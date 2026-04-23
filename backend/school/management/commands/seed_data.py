@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth.models import Group
 from users.models import User
-from school.models import Student, Course, Lesson
+from school.models import Student, Course, Lesson, LearningMaterial
 
 class Command(BaseCommand):
     help = 'Seeds the database with a larger set of initial data'
@@ -19,6 +19,7 @@ class Command(BaseCommand):
         Student.objects.all().delete()
         Course.objects.all().delete()
         Lesson.objects.all().delete()
+        LearningMaterial.objects.all().delete()
 
         self.stdout.write('Creating new data...')
 
@@ -76,17 +77,29 @@ class Command(BaseCommand):
         self.stdout.write(f'Created 10 parents with a total of {len(all_students)} students and assigned to Parent group.')
 
         all_courses = []
-        course_names = ['Matematyka', 'Fizyka', 'Chemia', 'Biologia', 'Historia', 'Geografia', 'Sztuka', 'Muzyka', 'Wychowanie fizyczne', 'Informatyka']
+        course_names = ['Matematyka', 'Fizyka', 'Chemia', 'Biologia', 'Historia', 'Geografia', 'Sztuka', 'Muzyka', 'Informatyka']
+        course_code_counter = 1
         for i, teacher in enumerate(teachers):
             num_courses = random.randint(1, 2)
             for j in range(num_courses):
                 course_name = random.choice(course_names)
+                course_code = f'{course_name[:3].upper()}-{course_code_counter}'
+                course_code_counter += 1
                 course = Course.objects.create(
                     teacher=teacher,
+                    course_code=course_code,
                     name=course_name,
-                    description=f'An introductory course on {course_name}.'
+                    description='',
                 )
                 all_courses.append(course)
+
+                for _ in range(random.randint(2, 4)):
+                    LearningMaterial.objects.create(
+                        course=course,
+                        title=f'Wikipedia - {course.name}',
+                        description=f'Najlepiej zacząć od przeczytania artykułu na Wikipedii.',
+                        url=f'https://pl.wikipedia.org/wiki/{course.name}'
+                    )
 
                 for k in range(random.randint(5, 10)):
                     days_to_add = random.randint(0, 4)
@@ -100,7 +113,7 @@ class Command(BaseCommand):
                         topic=f'Lesson {k+1}: {course_name}',
                         date=new_date.replace(hour=random.randint(8, 16), minute=0, second=0, microsecond=0)
                     )
-        self.stdout.write(f'Created {len(all_courses)} courses with lessons.')
+        self.stdout.write(f'Created {len(all_courses)} courses with lessons and learning materials.')
 
         if not all_courses:
             self.stdout.write(self.style.WARNING('No courses available to enroll students in.'))
@@ -108,7 +121,15 @@ class Command(BaseCommand):
             for student in all_students:
                 k = min(random.randint(1, 3), len(all_courses))
                 courses_to_enroll = random.sample(all_courses, k)
-                student.enrolled_courses.set(courses_to_enroll)
+
+                course_names_in_sample = set()
+                filtered_courses_to_enroll = []
+                for course in courses_to_enroll:
+                    if course.name not in course_names_in_sample:
+                        course_names_in_sample.add(course.name)
+                        filtered_courses_to_enroll.append(course)
+
+                student.enrolled_courses.set(filtered_courses_to_enroll)
             self.stdout.write('Enrolled students in courses.')
 
         self.stdout.write(self.style.SUCCESS('Successfully seeded database with a larger dataset.'))
