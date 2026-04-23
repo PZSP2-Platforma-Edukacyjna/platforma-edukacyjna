@@ -1,3 +1,5 @@
+"use client";
+
 import { redirect } from "next/navigation";
 import { isUserLoggedIn } from "@/lib/auth";
 
