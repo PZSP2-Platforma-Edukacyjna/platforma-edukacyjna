@@ -1,19 +1,14 @@
 @startuml
 skinparam classAttributeIconSize 0
 
-' ===== KLASY =====
-
 class Uzytkownik {
   id_uzytkownik : int
   email : string
   haslo : string
   imie : string
   nazwisko : string
+  rola : RolaUzytkownika
 }
-
-class Rodzic
-class Nauczyciel
-class Admin
 
 class Uczen {
   id_uczen : int
@@ -71,6 +66,12 @@ class Aktualnosc {
 
 ' ===== ENUMY =====
 
+enum RolaUzytkownika {
+  ADMIN
+  NAUCZYCIEL
+  RODZIC
+}
+
 enum StatusObecnosci {
   OBECNY
   NIEOBECNY_NIEUSPRAWIEDLIWIONY
@@ -87,17 +88,11 @@ enum StatusWiadomosci {
   NIEPRZECZYTANE
 }
 
-' ===== DZIEDZICZENIE =====
-
-Rodzic --|> Uzytkownik
-Nauczyciel --|> Uzytkownik
-Admin --|> Uzytkownik
-
 ' ===== RELACJE =====
 
-Rodzic "1" -- "0..*" Uczen
+Uzytkownik "1" -- "0..*" Uczen : rodzic
 
-Nauczyciel "1" -- "0..*" Kurs
+Uzytkownik "1" -- "0..*" Kurs : nauczyciel
 
 Kurs "1" -- "0..*" Lekcja
 
@@ -106,7 +101,7 @@ Lekcja "1" -- "0..*" Material
 Uczen "1" -- "0..*" Obecnosc
 Lekcja "1" -- "0..*" Obecnosc
 
-Rodzic "1" -- "0..*" Platnosc
+Uzytkownik "1" -- "0..*" Platnosc : rodzic
 Kurs "1" -- "0..*" Platnosc
 
 Uczen "0..*" -- "0..*" Kurs
@@ -114,6 +109,6 @@ Uczen "0..*" -- "0..*" Kurs
 Uzytkownik "1" -- "0..*" Wiadomosc : nadawca
 Uzytkownik "1" -- "0..*" Wiadomosc : adresat
 
-Nauczyciel "1" -- "0..*" Aktualnosc
+Uzytkownik "1" -- "0..*" Aktualnosc : autor
 
 @enduml

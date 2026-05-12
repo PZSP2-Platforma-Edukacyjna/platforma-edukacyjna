@@ -11,20 +11,9 @@ entity "UZYTKOWNIK" as UZYTKOWNIK {
   --
   email : string <<UNIQUE, NOT NULL>>
   haslo : string <<NOT NULL>>
-  imie  : string <<NOT NULL>>
+  imie : string <<NOT NULL>>
   nazwisko : string <<NOT NULL>>
-}
-
-entity "RODZIC" as RODZIC {
-  +id_rodzic : int <<PK, FK>>
-}
-
-entity "NAUCZYCIEL" as NAUCZYCIEL {
-  +id_nauczyciel : int <<PK, FK>>
-}
-
-entity "ADMIN" as ADMIN {
-  +id_admin : int <<PK, FK>>
+  rola : enum (ADMIN, NAUCZYCIEL, RODZIC) <<NOT NULL>>
 }
 
 entity "UCZEN" as UCZEN {
@@ -64,7 +53,11 @@ entity "MATERIAL" as MATERIAL {
 entity "OBECNOSC" as OBECNOSC {
   +id_obecnosc : int <<PK>>
   --
-  status : enum (OBECNY, NIEOBECNY_NIEUSPRAWIEDLIWIONY, NIEOBECNY_USPRAWIEDLIWIONY <<NOT NULL>>
+  status : enum (
+    OBECNY,
+    NIEOBECNY_NIEUSPRAWIEDLIWIONY,
+    NIEOBECNY_USPRAWIEDLIWIONY
+  ) <<NOT NULL>>
   id_uczen : int <<FK, NOT NULL>>
   id_lekcja : int <<FK, NOT NULL>>
 }
@@ -74,7 +67,10 @@ entity "PLATNOSC" as PLATNOSC {
   --
   kwota : decimal(10,2) <<NOT NULL>>
   data : date <<NOT NULL>>
-  status : enum (OPLACONA, NIEOPLACONA) <<NOT NULL>>
+  status : enum (
+    OPLACONA,
+    NIEOPLACONA
+  ) <<NOT NULL>>
   id_rodzic : int <<FK, NOT NULL>>
   id_kurs : int <<FK, NOT NULL>>
 }
@@ -85,7 +81,10 @@ entity "WIADOMOSC" as WIADOMOSC {
   temat : string <<NOT NULL>>
   tresc : string <<NOT NULL>>
   data : datetime <<NOT NULL>>
-  przeczytane : bool <<NOT NULL>>
+  status : enum (
+    PRZECZYTANE,
+    NIEPRZECZYTANE
+  ) <<NOT NULL>>
   id_nadawca : int <<FK, NOT NULL>>
   id_adresat : int <<FK, NOT NULL>>
 }
@@ -107,13 +106,9 @@ entity "UCZEN_KURS" as UCZEN_KURS {
 
 ' ===== RELACJE =====
 
-UZYTKOWNIK ||--|| RODZIC
-UZYTKOWNIK ||--|| NAUCZYCIEL
-UZYTKOWNIK ||--|| ADMIN
+UZYTKOWNIK ||--o{ UCZEN : rodzic
 
-RODZIC ||--o{ UCZEN
-
-NAUCZYCIEL ||--o{ KURS
+UZYTKOWNIK ||--o{ KURS : nauczyciel
 
 KURS ||--o{ LEKCJA
 
@@ -122,14 +117,15 @@ LEKCJA ||--o{ MATERIAL
 UCZEN ||--o{ OBECNOSC
 LEKCJA ||--o{ OBECNOSC
 
-RODZIC ||--o{ PLATNOSC
+UZYTKOWNIK ||--o{ PLATNOSC : rodzic
 KURS ||--o{ PLATNOSC
 
 UCZEN ||--o{ UCZEN_KURS
 KURS ||--o{ UCZEN_KURS
 
 UZYTKOWNIK ||--o{ WIADOMOSC : nadawca
-UZYTKOWNIK ||--o{ WIADOMOSC : odbiorca
+UZYTKOWNIK ||--o{ WIADOMOSC : adresat
 
-NAUCZYCIEL ||--o{ AKTUALNOSC
+UZYTKOWNIK ||--o{ AKTUALNOSC : autor
+
 @enduml
