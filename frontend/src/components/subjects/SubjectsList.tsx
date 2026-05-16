@@ -1,4 +1,4 @@
-type Course = {
+type CourseListItem = {
   id: number;
   course_code: string;
   name: string;
@@ -13,9 +13,9 @@ type Teacher = {
 };
 
 type SubjectsListProps = {
-  courses: Course[];
+  courses: CourseListItem[];
   teachers: Teacher[];
-  onCourseClick: (course: Course) => void;
+  onCourseClick: (course: CourseListItem) => void | Promise<void>;
 };
 
 export default function SubjectsList({
@@ -29,19 +29,24 @@ export default function SubjectsList({
   };
 
   return (
-    <div className="card h-full overflow-y-auto bg-white">
-      {courses.map((course) => (
-        <div
-          key={course.id}
-          className="card mb-3 h-20 flex flex-col justify-center cursor-pointer hover:bg-gray-100"
-          onClick={() => onCourseClick(course)}
-        >
-          <div className="font-semibold">{course.name}</div>
-          <div className="text-xs text-gray-500">
-            {getTeacherName(course.teacher)}
-          </div>
-        </div>
-      ))}
+    <div className="card h-full overflow-auto">
+      <h2 className="text-xl font-bold mb-4">Przedmioty</h2>
+
+      <ul className="space-y-2">
+        {courses.map((course) => (
+          <li
+            key={course.id}
+            onClick={() => onCourseClick(course)}
+            className="p-3 border rounded cursor-pointer hover:bg-gray-100"
+          >
+            <div className="font-semibold">{course.name}</div>
+            <div className="text-sm text-gray-600">{course.course_code}</div>
+            <div className="text-sm text-gray-500">
+              {getTeacherName(course.teacher)}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
