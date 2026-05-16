@@ -37,13 +37,16 @@ type LearningMaterial = {
   url: string;
 };
 
-type Course = {
+type CourseListItem = {
   id: number;
   course_code: string;
   name: string;
   description: string;
   teacher: number;
-  learning_materials?: LearningMaterial[];
+};
+
+type CourseDetailsData = CourseListItem & {
+  learning_materials: LearningMaterial[];
 };
 
 const dayMapping: Record<number, string> = {
@@ -95,14 +98,12 @@ export default function Dashboard() {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedChildCourses, setSelectedChildCourses] = useState<Course[]>(
-    []
-  );
+  const [courses, setCourses] = useState<CourseListItem[]>([]);
+  const [selectedChildCourses, setSelectedChildCourses] = useState<CourseListItem[]>([]);
+  const [detailedCourse, setDetailedCourse] = useState<CourseDetailsData | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detailedCourse, setDetailedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
     async function getData() {
@@ -191,28 +192,35 @@ export default function Dashboard() {
     setSchedule(newSchedule);
   };
 
-  const handleCourseClick = async (course: Course) => {
-    const token = getAccessToken();
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/${course.id}/`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) {
-        throw new Error("Failed to fetch course details");
+const handleCourseClick = async (course: CourseListItem) => {
+  const token = getAccessToken();
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/${course.id}/`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
       }
-      const courseDetails = await res.json();
-      setDetailedCourse(courseDetails);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("An unknown error occurred");
-      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch course details");
     }
-  };
+
+    const courseDetails = await res.json();
+
+    setDetailedCourse({
+      ...courseDetails,
+      learning_materials: courseDetails.learning_materials ?? [],
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      setError(error.message);
+    } else {
+      setError("An unknown error occurred");
+    }
+  }
+};
 
   const handleCloseDetails = () => {
     setDetailedCourse(null);
