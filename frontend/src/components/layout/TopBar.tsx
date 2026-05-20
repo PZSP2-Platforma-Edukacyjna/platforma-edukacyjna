@@ -8,7 +8,17 @@ type Props = {
   onSelectChild: (child: Child) => void;
 };
 
-export default function TopBar({ childList, selectedChild, onSelectChild }: Props) {
+export default function TopBar({
+  childList,
+  selectedChild,
+  onSelectChild,
+}: Props) {
+  const handleLogout = () => {
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    window.location.href = "/login";
+  };
+
   return (
     <div className="flex justify-between items-center p-4 border-b bg-white">
       <div className="flex gap-3">
@@ -25,7 +35,16 @@ export default function TopBar({ childList, selectedChild, onSelectChild }: Prop
         ))}
       </div>
 
-      <div className="btn">Konto</div>
+      <div className="flex gap-3">
+        <div className="btn">Konto</div>
+
+        <button
+          className="btn"
+          onClick={handleLogout}
+        >
+          Wyloguj
+        </button>
+      </div>
     </div>
   );
 }
