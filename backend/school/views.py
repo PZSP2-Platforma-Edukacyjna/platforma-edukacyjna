@@ -8,7 +8,7 @@ from .serializers import (
     CourseDetailSerializer,
     LearningMaterialSerializer,
 )
-from .permissions import IsParent
+from .permissions import IsParent, IsAdmin
 
 
 class MyChildrenView(generics.ListAPIView):
@@ -60,3 +60,18 @@ class LearningMaterialViewSet(viewsets.ModelViewSet):
     queryset = LearningMaterial.objects.all()
     serializer_class = LearningMaterialSerializer
     permission_classes = [IsAuthenticated]
+
+class AdminStudentViewSet(viewsets.ModelViewSet):
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer
+    permission_classes = [IsAdmin]
+
+class AdminCourseViewSet(viewsets.ModelViewSet):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsAdmin]
+
+class AdminLessonViewSet(viewsets.ModelViewSet):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = [IsAdmin]

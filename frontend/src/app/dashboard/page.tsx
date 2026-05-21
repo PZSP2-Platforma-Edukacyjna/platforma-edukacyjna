@@ -4,7 +4,7 @@ import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import SubjectsList from "@/components/subjects/SubjectsList";
 import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getUserRole } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import CourseDetails from "@/components/subjects/CourseDetails";
 
@@ -59,16 +59,10 @@ const dayMapping: Record<number, string> = {
   6: "Sob",
 };
 
-function processSchedule(
-  lessons: Lesson[],
-  courses: number[],
-  teachers: Teacher[]
-): Schedule {
+function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher[]): Schedule {
   const schedule: Schedule = {};
 
-  const filteredLessons = lessons.filter((lesson) =>
-    courses.includes(lesson.course)
-  );
+  const filteredLessons = lessons.filter((lesson) => courses.includes(lesson.course));
 
   filteredLessons.forEach((lesson) => {
     const date = new Date(lesson.date);
@@ -83,9 +77,7 @@ function processSchedule(
 
     schedule[day][hour] = {
       subject: lesson.course_name,
-      teacher: teacher
-        ? `${teacher.first_name} ${teacher.last_name}`
-        : "Unknown",
+      teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown",
       status: "present",
     };
   });
@@ -104,39 +96,35 @@ export default function Dashboard() {
   const [schedule, setSchedule] = useState<Schedule>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function getData() {
+      const role = getUserRole();
+      if (role === "ADMIN") {
+        setIsAdmin(true);
+        setLoading(false);
+        return;
+      }
+
       const token = getAccessToken();
       try {
-        const [childrenRes, lessonsRes, teachersRes, coursesRes] =
-          await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(
-              `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            ),
-            fetch(
-              `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            ),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-          ]);
+        const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        if (
-          !childrenRes.ok ||
-          !lessonsRes.ok ||
-          !teachersRes.ok ||
-          !coursesRes.ok
-        ) {
+        if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
           throw new Error("Failed to fetch data");
         }
         const childrenData = await childrenRes.json();
@@ -151,13 +139,7 @@ export default function Dashboard() {
 
         if (childrenData.length > 0) {
           setSelectedChild(childrenData[0]);
-          setSchedule(
-            processSchedule(
-              lessonsData,
-              childrenData[0].enrolled_courses,
-              teachersData
-            )
-          );
+          setSchedule(processSchedule(lessonsData, childrenData[0].enrolled_courses, teachersData));
         }
       } catch (error: unknown) {
         if (error instanceof Error) {
@@ -176,7 +158,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (selectedChild && courses.length > 0) {
       const childCourses = courses.filter((course) =>
-        selectedChild.enrolled_courses.includes(course.id)
+        selectedChild.enrolled_courses.includes(course.id),
       );
       setSelectedChildCourses(childCourses);
     }
@@ -184,43 +166,36 @@ export default function Dashboard() {
 
   const handleSelectChild = (child: Child) => {
     setSelectedChild(child);
-    const newSchedule = processSchedule(
-      lessons,
-      child.enrolled_courses,
-      teachers
-    );
+    const newSchedule = processSchedule(lessons, child.enrolled_courses, teachers);
     setSchedule(newSchedule);
   };
 
-const handleCourseClick = async (course: CourseListItem) => {
-  const token = getAccessToken();
+  const handleCourseClick = async (course: CourseListItem) => {
+    const token = getAccessToken();
 
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/${course.id}/`,
-      {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/${course.id}/`, {
         headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch course details");
       }
-    );
 
-    if (!res.ok) {
-      throw new Error("Failed to fetch course details");
+      const courseDetails = await res.json();
+
+      setDetailedCourse({
+        ...courseDetails,
+        learning_materials: courseDetails.learning_materials ?? [],
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("An unknown error occurred");
+      }
     }
-
-    const courseDetails = await res.json();
-
-    setDetailedCourse({
-      ...courseDetails,
-      learning_materials: courseDetails.learning_materials ?? [],
-    });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      setError(error.message);
-    } else {
-      setError("An unknown error occurred");
-    }
-  }
-};
+  };
 
   const handleCloseDetails = () => {
     setDetailedCourse(null);
@@ -232,17 +207,20 @@ const handleCourseClick = async (course: CourseListItem) => {
         childList={children}
         selectedChild={selectedChild}
         onSelectChild={handleSelectChild}
+        isAdmin={isAdmin}
       />
 
       <div className="flex flex-1 gap-4 p-4">
         {/* LEWA */}
         <div className="flex flex-col flex-[4] gap-4">
           {/* PLAN */}
-          <div className="card flex-[2] overflow-auto">
-            {loading && <div>Loading...</div>}
-            {error && <div>Error: {error}</div>}
-            {!loading && !error && <ScheduleGrid schedule={schedule} />}
-          </div>
+          {!isAdmin && (
+            <div className="card flex-[2] overflow-auto">
+              {loading && <div>Loading...</div>}
+              {error && <div>Error: {error}</div>}
+              {!loading && !error && <ScheduleGrid schedule={schedule} />}
+            </div>
+          )}
 
           {/* DÓŁ */}
           <div className="flex flex-[1] gap-4">
@@ -257,19 +235,17 @@ const handleCourseClick = async (course: CourseListItem) => {
         </div>
 
         {/* PRAWA */}
-        <div className="flex-[1] max-w-[20%]">
-          <SubjectsList
-            courses={selectedChildCourses}
-            teachers={teachers}
-            onCourseClick={handleCourseClick}
-          />
-        </div>
-        {detailedCourse && (
-          <CourseDetails
-            course={detailedCourse}
-            teachers={teachers}
-            onClose={handleCloseDetails}
-          />
+        {!isAdmin && (
+          <div className="flex-[1] max-w-[20%]">
+            <SubjectsList
+              courses={selectedChildCourses}
+              teachers={teachers}
+              onCourseClick={handleCourseClick}
+            />
+          </div>
+        )}
+        {!isAdmin && detailedCourse && (
+          <CourseDetails course={detailedCourse} teachers={teachers} onClose={handleCloseDetails} />
         )}
       </div>
     </div>
