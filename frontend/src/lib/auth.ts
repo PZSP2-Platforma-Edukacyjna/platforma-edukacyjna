@@ -13,24 +13,19 @@ export async function login(email: string, password: string): Promise<boolean> {
       body: JSON.stringify({ email, password }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Login failed:", errorData);
-      return false;
-    }
+    if (!response.ok) return false;
 
     const data = await response.json();
     Cookies.set(ACCESS_TOKEN_KEY, data.access, { expires: 1 }); // Expires in 1 day
     Cookies.set(REFRESH_TOKEN_KEY, data.refresh, { expires: 7 }); // Expires in 7 days
     return true;
-  } catch (error) {
-    console.error("Network error or unexpected:", error);
+  } catch {
     return false;
   }
 }
 
 export function isUserLoggedIn(): boolean {
-  return Cookies.get(ACCESS_TOKEN_KEY) !== undefined;
+  return !!Cookies.get(ACCESS_TOKEN_KEY);
 }
 
 export function getAccessToken(): string | undefined {
@@ -44,6 +39,8 @@ export function getRefreshToken(): string | undefined {
 export function logout(): void {
   Cookies.remove(ACCESS_TOKEN_KEY);
   Cookies.remove(REFRESH_TOKEN_KEY);
+
+  window.location.href = "/login";
 }
 
 export function getUserRole(): string | null {

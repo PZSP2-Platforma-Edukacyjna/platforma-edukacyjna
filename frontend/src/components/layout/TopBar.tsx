@@ -12,6 +12,15 @@ type Props = {
 };
 
 export default function TopBar({
+  childList,
+  selectedChild,
+  onSelectChild,
+}: Props) {
+  const handleLogout = () => {
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    window.location.href = "/login";
+  };
   childList = [],
   selectedChild = null,
   onSelectChild = () => {},
@@ -36,6 +45,15 @@ export default function TopBar({
         ))}
       </div>
 
+      <div className="flex gap-3">
+        <div className="btn">Konto</div>
+
+        <button
+          className="btn"
+          onClick={handleLogout}
+        >
+          Wyloguj
+        </button>
       <div className="flex gap-4 items-center">
         {isAdmin && (
           <Link href={isOnAdminPage ? "/dashboard" : "/admin"} className="btn btn-primary">

@@ -7,6 +7,7 @@ import NewsList from "@/components/news/NewsList";
 import { getAccessToken, getUserRole } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import CourseDetails from "@/components/subjects/CourseDetails";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 export type Child = {
   id: number;
@@ -86,6 +87,7 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
 }
 
 export default function Dashboard() {
+  useSessionTimeout();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
