@@ -29,10 +29,19 @@ class Command(BaseCommand):
         parent_group, _ = Group.objects.get_or_create(name='Parent')
 
         admin_user = None
-        if not User.objects.filter(username='admin').exists():
-            admin_user = User.objects.create_superuser('admin', 'admin@example.com', 'adminpassword')
-            admin_user.groups.add(admin_group)
-            self.stdout.write('Created admin user and assigned to Admin group.')
+        if not User.objects.filter(email='admin@example.com').exists():
+            admin_user = User.objects.create_superuser(
+                username='admin',
+                email='admin@example.com',
+                password='adminpassword'
+            )
+            self.stdout.write('Created admin user (admin@example.com / adminpassword)')
+        else:
+            admin_user = User.objects.get(email='admin@example.com')
+
+        admin_user.role = User.Role.ADMIN
+        admin_user.groups.add(admin_group)
+        admin_user.save()
 
         teachers = []
         for i in range(5):

@@ -42,3 +42,15 @@ export function logout(): void {
 
   window.location.href = "/login";
 }
+
+export function getUserRole(): string | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded.role || null;
+  } catch {
+    return null;
+  }
+}

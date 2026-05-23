@@ -2,6 +2,11 @@
 
 from django.db import migrations, models
 
+def gen_unique_codes(apps, schema_editor):
+    Course = apps.get_model('school', 'Course')
+    for i, course in enumerate(Course.objects.filter(course_code__isnull=True)):
+        course.course_code = f"temp-{course.id}-{i}"
+        course.save()
 
 class Migration(migrations.Migration):
 
@@ -10,6 +15,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(gen_unique_codes, reverse_code=migrations.RunPython.noop),
         migrations.AlterField(
             model_name='course',
             name='course_code',

@@ -1,0 +1,250 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { getAccessToken } from "@/lib/auth";
+
+type User = {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+};
+
+export default function UsersAdmin() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form states
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    email: "",
+    first_name: "",
+    last_name: "",
+    role: "PARENT",
+    password: "",
+  });
+
+  const fetchUsers = async () => {
+    const token = getAccessToken();
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/manage/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
+      setUsers(data);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError("An unknown error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingUserId(user.id);
+    setFormData({
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      role: user.role,
+      password: "",
+    });
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Na pewno usunąć?")) return;
+    const token = getAccessToken();
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/manage/${id}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchUsers();
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        alert("Error: " + e.message);
+      } else {
+        alert("An unknown error occurred");
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = getAccessToken();
+    const isEdit = editingUserId !== null;
+    const url = isEdit
+      ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/manage/${editingUserId}/`
+      : `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/manage/`;
+    const method = isEdit ? "PATCH" : "POST";
+
+    const body: Record<string, string> = { ...formData };
+    if (!body.password) delete body.password; // Don't send empty password
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert("Błąd: " + JSON.stringify(errorData));
+        return;
+      }
+
+      setEditingUserId(null);
+      setFormData({ email: "", first_name: "", last_name: "", role: "PARENT", password: "" });
+      fetchUsers();
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        alert("Error: " + e.message);
+      } else {
+        alert("An unknown error occurred");
+      }
+    }
+  };
+
+  if (loading) return <div>Ładowanie...</div>;
+  if (error) return <div>Błąd: {error}</div>;
+
+  return (
+    <div className="flex gap-8">
+      <div className="flex-[2]">
+        <h2 className="text-xl font-bold mb-4">Lista Użytkowników</h2>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b bg-gray-100">
+              <th className="p-2">ID</th>
+              <th className="p-2">Email</th>
+              <th className="p-2">Imię i nazwisko</th>
+              <th className="p-2">Rola</th>
+              <th className="p-2">Akcje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id} className="border-b">
+                <td className="p-2">{user.id}</td>
+                <td className="p-2">{user.email}</td>
+                <td className="p-2">
+                  {user.first_name} {user.last_name}
+                </td>
+                <td className="p-2">{user.role}</td>
+                <td className="p-2 gap-2 flex">
+                  <button
+                    onClick={() => handleEdit(user)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Edytuj
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="text-red-500 hover:underline"
+                  >
+                    Usuń
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex-1 p-4 border rounded shadow bg-white h-fit">
+        <h2 className="text-xl font-bold mb-4">
+          {editingUserId ? "Edytuj Użytkownika" : "Dodaj Użytkownika"}
+        </h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            className="border p-2 rounded"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+          <input
+            type="text"
+            name="first_name"
+            placeholder="Imię"
+            className="border p-2 rounded"
+            value={formData.first_name}
+            onChange={handleChange}
+            required
+          />
+          <input
+            type="text"
+            name="last_name"
+            placeholder="Nazwisko"
+            className="border p-2 rounded"
+            value={formData.last_name}
+            onChange={handleChange}
+            required
+          />
+          <select
+            name="role"
+            className="border p-2 rounded"
+            value={formData.role}
+            onChange={handleChange}
+          >
+            <option value="PARENT">Rodzic</option>
+            <option value="TEACHER">Nauczyciel</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+          <input
+            type="password"
+            name="password"
+            placeholder={editingUserId ? "Nowe hasło (opcjonalne)" : "Hasło"}
+            className="border p-2 rounded"
+            value={formData.password}
+            onChange={handleChange}
+            required={!editingUserId}
+          />
+          <div className="flex gap-2">
+            <button type="submit" className="btn btn-primary flex-1">
+              {editingUserId ? "Zapisz" : "Dodaj"}
+            </button>
+            {editingUserId && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setEditingUserId(null);
+                  setFormData({
+                    email: "",
+                    first_name: "",
+                    last_name: "",
+                    role: "PARENT",
+                    password: "",
+                  });
+                }}
+              >
+                Anuluj
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
