@@ -6,9 +6,13 @@ export function proxy(request: NextRequest) {
   const accessToken = request.cookies.get("access_token")?.value;
 
   const isAdminRoute = pathname.startsWith("/admin");
-  const isDashboardRoute = pathname.startsWith("/dashboard");
+  const isUserRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/messages") ||
+    pathname.startsWith("/payments");
 
-  if (isAdminRoute || isDashboardRoute) {
+  if (isAdminRoute || isUserRoute) {
     if (!accessToken) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -32,5 +36,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/dashboard/:path*",
+    "/account/:path*",
+    "/messages/:path*",
+    "/payments/:path*",
+  ],
 };

@@ -1,34 +1,14 @@
 "use client";
+
 import TopBar from "@/components/layout/TopBar";
-import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
-import SubjectsList from "@/components/subjects/SubjectsList";
 import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
-import { getAccessToken, getUserRole } from "@/lib/auth";
-import { useEffect, useState } from "react";
+import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
-
-export type Child = {
-  id: number;
-  first_name: string;
-  last_name: string;
-  enrolled_courses: number[];
-};
-
-type Teacher = {
-  id: number;
-  first_name: string;
-  last_name: string;
-};
-
-type Lesson = {
-  id: number;
-  course: number;
-  course_name: string;
-  topic: string;
-  date: string;
-  teacher: number;
-};
+import SubjectsList from "@/components/subjects/SubjectsList";
+import { getAccessToken, getUserRole } from "@/lib/auth";
+import type { Child, Lesson, Teacher } from "@/types/school";
+import { useEffect, useState } from "react";
 
 type LearningMaterial = {
   id: number;
@@ -73,7 +53,7 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
       schedule[day] = {};
     }
 
-    const teacher = teachers.find((t) => t.id === lesson.teacher);
+    const teacher = teachers.find((item) => item.id === lesson.teacher);
 
     schedule[day][hour] = {
       subject: lesson.course_name,
@@ -101,6 +81,7 @@ export default function Dashboard() {
   useEffect(() => {
     async function getData() {
       const role = getUserRole();
+
       if (role === "ADMIN") {
         setIsAdmin(true);
         setLoading(false);
@@ -108,6 +89,7 @@ export default function Dashboard() {
       }
 
       const token = getAccessToken();
+
       try {
         const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
@@ -127,10 +109,11 @@ export default function Dashboard() {
         if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
           throw new Error("Failed to fetch data");
         }
-        const childrenData = await childrenRes.json();
-        const lessonsData = await lessonsRes.json();
-        const teachersData = await teachersRes.json();
-        const coursesData = await coursesRes.json();
+
+        const childrenData = (await childrenRes.json()) as Child[];
+        const lessonsData = (await lessonsRes.json()) as Lesson[];
+        const teachersData = (await teachersRes.json()) as Teacher[];
+        const coursesData = (await coursesRes.json()) as CourseListItem[];
 
         setChildren(childrenData);
         setLessons(lessonsData);
@@ -141,9 +124,9 @@ export default function Dashboard() {
           setSelectedChild(childrenData[0]);
           setSchedule(processSchedule(lessonsData, childrenData[0].enrolled_courses, teachersData));
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          setError(error.message);
+      } catch (requestError: unknown) {
+        if (requestError instanceof Error) {
+          setError(requestError.message);
         } else {
           setError("An unknown error occurred");
         }
@@ -182,15 +165,15 @@ export default function Dashboard() {
         throw new Error("Failed to fetch course details");
       }
 
-      const courseDetails = await res.json();
+      const courseDetails = (await res.json()) as CourseDetailsData;
 
       setDetailedCourse({
         ...courseDetails,
         learning_materials: courseDetails.learning_materials ?? [],
       });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message);
+    } catch (requestError: unknown) {
+      if (requestError instanceof Error) {
+        setError(requestError.message);
       } else {
         setError("An unknown error occurred");
       }
@@ -211,18 +194,15 @@ export default function Dashboard() {
       />
 
       <div className="flex flex-1 gap-4 p-4">
-        {/* LEWA */}
         <div className="flex flex-col flex-[4] gap-4">
-          {/* PLAN */}
           {!isAdmin && (
             <div className="card flex-[2] overflow-auto">
-              {loading && <div>Loading...</div>}
-              {error && <div>Error: {error}</div>}
+              {loading && <div>Ładowanie...</div>}
+              {error && <div>Błąd: {error}</div>}
               {!loading && !error && <ScheduleGrid schedule={schedule} />}
             </div>
           )}
 
-          {/* DÓŁ */}
           <div className="flex flex-[1] gap-4">
             <div className="flex-1">
               <NewsList />
@@ -234,7 +214,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* PRAWA */}
         {!isAdmin && (
           <div className="flex-[1] max-w-[20%]">
             <SubjectsList

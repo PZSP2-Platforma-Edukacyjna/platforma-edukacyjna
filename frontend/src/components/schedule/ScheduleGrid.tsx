@@ -17,24 +17,24 @@ type Props = {
 
 export default function ScheduleGrid({ schedule }: Props) {
   const hours = Array.from({ length: 10 }, (_, i) => 8 + i);
-  console.log("ScheduleGrid schedule:", schedule);
 
   return (
-    <div className="grid grid-cols-6 gap-1 text-xs">
+    <div className="grid w-full grid-cols-[3rem_repeat(5,minmax(0,1fr))] gap-1 text-xs">
       <div></div>
 
-      {days.map((d) => (
-        <div key={d} className="text-center font-semibold">
-          {d}
+      {days.map((day) => (
+        <div key={day} className="text-center font-semibold">
+          {day}
         </div>
       ))}
 
       {hours.map((hour) => (
         <React.Fragment key={hour}>
-          <div className="text-right pr-2">{hour}:00</div>
+          <div className="self-start pr-2 pt-1 text-right">{hour}:00</div>
 
           {days.map((day) => {
             const lesson = schedule[day]?.[hour];
+
             return (
               <ScheduleTile
                 key={day + hour}
