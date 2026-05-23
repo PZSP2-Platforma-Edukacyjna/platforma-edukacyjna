@@ -3,6 +3,16 @@ from rest_framework.permissions import IsAuthenticated
 from .models import User
 from .serializers import TeacherSerializer, UserSerializer
 from school.permissions import IsAdmin
+from django.db.models import Q
+from .models import Student, Lesson, Course, LearningMaterial, Message
+from .serializers import (
+    StudentSerializer,
+    LessonSerializer,
+    CourseSerializer,
+    CourseDetailSerializer,
+    LearningMaterialSerializer,
+    MessageSerializer,
+)
 
 class TeacherListView(generics.ListAPIView):
     """
@@ -21,3 +31,19 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAdmin]
     queryset = User.objects.all()
+
+class MessageViewSet(viewsets.ModelViewSet):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            Message.objects
+            .filter(Q(sender=user) | Q(recipient=user))
+            .order_by("created_at")
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(sender=self.request.user)
