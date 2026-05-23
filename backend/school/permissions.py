@@ -7,3 +7,10 @@ class IsParent(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated and request.user.role == User.Role.PARENT
+
+class IsAdmin(permissions.BasePermission):
+    """
+    Custom permission to only allow admin users.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == User.Role.ADMIN

@@ -18,11 +18,7 @@ type SubjectsListProps = {
   onCourseClick: (course: CourseListItem) => void | Promise<void>;
 };
 
-export default function SubjectsList({
-  courses,
-  teachers,
-  onCourseClick,
-}: SubjectsListProps) {
+export default function SubjectsList({ courses, teachers, onCourseClick }: SubjectsListProps) {
   const getTeacherName = (teacherId: number) => {
     const teacher = teachers.find((t) => t.id === teacherId);
     return teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown";
@@ -41,9 +37,7 @@ export default function SubjectsList({
           >
             <div className="font-semibold">{course.name}</div>
             <div className="text-sm text-gray-600">{course.course_code}</div>
-            <div className="text-sm text-gray-500">
-              {getTeacherName(course.teacher)}
-            </div>
+            <div className="text-sm text-gray-500">{getTeacherName(course.teacher)}</div>
           </li>
         ))}
       </ul>
