@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import User
-from .models import Student, Lesson, Course, LearningMaterial, Message
+from .models import User, Message
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email'
@@ -44,6 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     recipient_name = serializers.SerializerMethodField()
+    is_mine = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -56,11 +56,22 @@ class MessageSerializer(serializers.ModelSerializer):
             "body",
             "created_at",
             "read_at",
+            "is_mine",
         ]
-        read_only_fields = ["id", "sender", "created_at", "read_at"]
+        read_only_fields = ["id", "sender", "created_at", "read_at", "is_mine"]
 
     def get_sender_name(self, obj):
-        return f"{obj.sender.first_name} {obj.sender.last_name}".strip() or obj.sender.email
+        full_name = f"{obj.sender.first_name} {obj.sender.last_name}".strip()
+        return full_name or obj.sender.email
 
     def get_recipient_name(self, obj):
-        return f"{obj.recipient.first_name} {obj.recipient.last_name}".strip() or obj.recipient.email
+        full_name = f"{obj.recipient.first_name} {obj.recipient.last_name}".strip()
+        return full_name or obj.recipient.email
+
+    def get_is_mine(self, obj):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return False
+
+        return obj.sender_id == request.user.id

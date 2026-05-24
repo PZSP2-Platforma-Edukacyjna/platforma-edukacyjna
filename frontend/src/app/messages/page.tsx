@@ -1,86 +1,81 @@
 "use client";
 
 import TopBar from "@/components/layout/TopBar";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
+import { getUserRole } from "@/lib/auth";
 import type { Child, Lesson, Teacher } from "@/types/school";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+type CreateMessageRequest = {
+  recipient: number;
+  body: string;
+};
+
+type BackendMessage = {
+  id: number;
+  sender: number;
+  sender_name: string;
+  recipient: number;
+  recipient_name: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+  is_mine: boolean;
+};
+
 type Message = {
   id: string;
-  author: "parent" | "teacher" | "school";
+  author: "me" | "other";
   authorName: string;
   body: string;
   sentAt: string;
 };
 
+type Contact = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role?: string;
+};
+
 type Conversation = {
   id: string;
+  recipientId: number;
   title: string;
   subtitle: string;
   messages: Message[];
   unread: number;
 };
 
-const fallbackConversations: Conversation[] = [
-  {
-    id: "secretariat",
-    title: "Sekretariat",
-    subtitle: "Sprawy organizacyjne",
-    unread: 1,
-    messages: [
-      {
-        id: "secretariat-1",
-        author: "school",
-        authorName: "Sekretariat",
-        body: "Przypominamy o aktualizacji danych kontaktowych w panelu rodzica.",
-        sentAt: "2026-05-21T09:20:00",
-      },
-    ],
-  },
-  {
-    id: "math",
-    title: "Anna Nowak",
-    subtitle: "Matematyka",
-    unread: 0,
-    messages: [
-      {
-        id: "math-1",
-        author: "teacher",
-        authorName: "Anna Nowak",
-        body: "Dzień dobry, kolejny sprawdzian obejmuje tematy z ostatnich trzech lekcji.",
-        sentAt: "2026-05-20T14:30:00",
-      },
-    ],
-  },
-];
+function getContactName(contact: Contact): string {
+  const fullName = `${contact.first_name} ${contact.last_name}`.trim();
 
-function buildConversations(teachers: Teacher[], lessons: Lesson[]): Conversation[] {
-  if (teachers.length === 0) {
-    return fallbackConversations;
+  return fullName || contact.email;
+}
+
+function getStoredSelectedChildId(): number | null {
+  if (typeof window === "undefined") {
+    return null;
   }
 
-  return teachers.map((teacher, index) => {
-    const lesson = lessons.find((item) => item.teacher === teacher.id);
-    const subject = lesson?.course_name ?? "Nauczyciel";
+  const value = window.localStorage.getItem("selectedChildId");
 
-    return {
-      id: `teacher-${teacher.id}`,
-      title: `${teacher.first_name} ${teacher.last_name}`,
-      subtitle: subject,
-      unread: index === 0 ? 1 : 0,
-      messages: [
-        {
-          id: `teacher-${teacher.id}-intro`,
-          author: "teacher",
-          authorName: `${teacher.first_name} ${teacher.last_name}`,
-          body: lesson
-            ? `Dzień dobry, najbliższy temat zajęć to: ${lesson.topic}.`
-            : "Dzień dobry, proszę o kontakt w razie pytań dotyczących zajęć.",
-          sentAt: lesson?.date ?? new Date().toISOString(),
-        },
-      ],
-    };
-  });
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function storeSelectedChildId(childId: number): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem("selectedChildId", String(childId));
 }
 
 function formatDate(value: string): string {
@@ -90,28 +85,261 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+function backendMessageToFrontendMessage(message: BackendMessage): Message {
+  return {
+    id: String(message.id),
+    author: message.is_mine ? "me" : "other",
+    authorName: message.is_mine ? "Ty" : message.sender_name,
+    body: message.body,
+    sentAt: message.created_at,
+  };
+}
+
+function teacherToContact(teacher: Teacher): Contact {
+  return {
+    id: teacher.id,
+    first_name: teacher.first_name,
+    last_name: teacher.last_name,
+    email: "email" in teacher ? String(teacher.email) : "",
+    role: "TEACHER",
+  };
+}
+
+function getTeacherIdsForChild(child: Child | null, lessons: Lesson[]): Set<number> {
+  if (!child) {
+    return new Set();
+  }
+
+  const childCourseIds = new Set(child.enrolled_courses);
+
+  return new Set(
+    lessons
+      .filter((lesson) => childCourseIds.has(lesson.course))
+      .map((lesson) => lesson.teacher),
+  );
+}
+
+function getSubtitleForParentContact(
+  contactId: number,
+  selectedChild: Child | null,
+  lessons: Lesson[],
+): string {
+  if (!selectedChild) {
+    return "Nauczyciel";
+  }
+
+  const childCourseIds = new Set(selectedChild.enrolled_courses);
+
+  const lesson = lessons.find(
+    (item) => childCourseIds.has(item.course) && item.teacher === contactId,
+  );
+
+  return lesson?.course_name ?? "Nauczyciel";
+}
+
+function buildConversationsFromMessagesAndContacts(
+  contacts: Contact[],
+  backendMessages: BackendMessage[],
+  getSubtitle: (contactId: number) => string,
+  manualContactId: number | null,
+): Conversation[] {
+  const contactsById = new Map<number, Contact>();
+
+  for (const contact of contacts) {
+    contactsById.set(contact.id, contact);
+  }
+
+  const conversationsByContactId = new Map<number, Conversation>();
+
+  for (const backendMessage of backendMessages) {
+    const otherUserId = backendMessage.is_mine
+      ? backendMessage.recipient
+      : backendMessage.sender;
+
+    const contact = contactsById.get(otherUserId);
+
+    if (!contact) {
+      continue;
+    }
+
+    const frontendMessage = backendMessageToFrontendMessage(backendMessage);
+    const existingConversation = conversationsByContactId.get(otherUserId);
+
+    if (existingConversation) {
+      existingConversation.messages.push(frontendMessage);
+    } else {
+      conversationsByContactId.set(otherUserId, {
+        id: `user-${otherUserId}`,
+        recipientId: otherUserId,
+        title: getContactName(contact),
+        subtitle: getSubtitle(otherUserId),
+        unread: 0,
+        messages: [frontendMessage],
+      });
+    }
+  }
+
+  if (manualContactId !== null && !conversationsByContactId.has(manualContactId)) {
+    const contact = contactsById.get(manualContactId);
+
+    if (contact) {
+      conversationsByContactId.set(manualContactId, {
+        id: `user-${manualContactId}`,
+        recipientId: manualContactId,
+        title: getContactName(contact),
+        subtitle: getSubtitle(manualContactId),
+        unread: 0,
+        messages: [],
+      });
+    }
+  }
+
+  return Array.from(conversationsByContactId.values())
+    .map((conversation) => ({
+      ...conversation,
+      messages: [...conversation.messages].sort(
+        (left, right) =>
+          new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime(),
+      ),
+    }))
+    .sort((left, right) => {
+      const leftLastMessage = left.messages[left.messages.length - 1];
+      const rightLastMessage = right.messages[right.messages.length - 1];
+
+      if (!leftLastMessage && !rightLastMessage) {
+        return left.title.localeCompare(right.title);
+      }
+
+      if (!leftLastMessage) {
+        return 1;
+      }
+
+      if (!rightLastMessage) {
+        return -1;
+      }
+
+      return (
+        new Date(rightLastMessage.sentAt).getTime() -
+        new Date(leftLastMessage.sentAt).getTime()
+      );
+    });
+}
+
 export default function MessagesPage() {
+  const [role, setRole] = useState<string | null>(null);
+
   const [children, setChildren] = useState<Child[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations);
-  const [selectedId, setSelectedId] = useState(fallbackConversations[0].id);
+  const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [backendMessages, setBackendMessages] = useState<BackendMessage[]>([]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [manualContactId, setManualContactId] = useState<number | null>(null);
+
   const [search, setSearch] = useState("");
+  const [selectedContactValue, setSelectedContactValue] = useState("");
   const [draft, setDraft] = useState("");
+
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const availableContacts = useMemo(() => {
+    if (role !== "PARENT") {
+      return allContacts;
+    }
+
+    if (!selectedChild) {
+      return [];
+    }
+
+    const teacherIdsForChild = getTeacherIdsForChild(selectedChild, lessons);
+
+    return allContacts.filter((contact) => teacherIdsForChild.has(contact.id));
+  }, [allContacts, lessons, role, selectedChild]);
+
+  const conversations = useMemo(() => {
+    return buildConversationsFromMessagesAndContacts(
+      availableContacts,
+      backendMessages,
+      (contactId) => {
+        if (role === "PARENT") {
+          return getSubtitleForParentContact(contactId, selectedChild, lessons);
+        }
+
+        return "Rozmowa";
+      },
+      manualContactId,
+    );
+  }, [availableContacts, backendMessages, lessons, manualContactId, role, selectedChild]);
+
+  useEffect(() => {
+    if (conversations.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+
+    const selectedConversationStillExists = conversations.some(
+      (conversation) => conversation.id === selectedId,
+    );
+
+    if (!selectedConversationStillExists) {
+      setSelectedId(conversations[0].id);
+    }
+  }, [conversations, selectedId]);
 
   useEffect(() => {
     async function loadMessagesContext() {
       try {
-        const [childrenData, teachersData, lessonsData] = await Promise.all([
-          apiGet<Child[]>("/api/my-children/"),
-          apiGet<Teacher[]>("/api/users/teachers/"),
-          apiGet<Lesson[]>("/api/my-children/schedule/"),
-        ]);
-        const nextConversations = buildConversations(teachersData, lessonsData);
+        const currentRole = getUserRole();
 
-        setChildren(childrenData);
-        setConversations(nextConversations);
-        setSelectedId(nextConversations[0]?.id ?? fallbackConversations[0].id);
+        setRole(currentRole);
+
+        const messagesData = await apiGet<BackendMessage[]>("/api/users/messages/");
+        setBackendMessages(messagesData);
+
+        if (currentRole === "PARENT") {
+          const [childrenData, teachersData, lessonsData] = await Promise.all([
+            apiGet<Child[]>("/api/my-children/"),
+            apiGet<Teacher[]>("/api/users/teachers/"),
+            apiGet<Lesson[]>("/api/my-children/schedule/"),
+          ]);
+
+          const storedChildId = getStoredSelectedChildId();
+
+          const initialSelectedChild =
+            childrenData.find((child) => child.id === storedChildId) ??
+            childrenData[0] ??
+            null;
+
+          setChildren(childrenData);
+          setSelectedChild(initialSelectedChild);
+          setLessons(lessonsData);
+          setAllContacts(teachersData.map(teacherToContact));
+          setError(null);
+          return;
+        }
+
+        if (currentRole === "TEACHER") {
+          const contactsData = await apiGet<Contact[]>("/api/users/contacts/");
+
+          setChildren([]);
+          setSelectedChild(null);
+          setLessons([]);
+          setAllContacts(contactsData);
+          setError(null);
+          return;
+        }
+
+        const contactsData = await apiGet<Contact[]>("/api/users/contacts/");
+
+        setChildren([]);
+        setSelectedChild(null);
+        setLessons([]);
+        setAllContacts(contactsData);
+        setError(null);
       } catch (messagesError) {
         setError(
           messagesError instanceof Error
@@ -141,9 +369,25 @@ export default function MessagesPage() {
   }, [conversations, search]);
 
   const selectedConversation =
-    conversations.find((conversation) => conversation.id === selectedId) ?? conversations[0];
+    conversations.find((conversation) => conversation.id === selectedId) ?? null;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSelectChild = (child: Child) => {
+    storeSelectedChildId(child.id);
+    setSelectedChild(child);
+    setManualContactId(null);
+    setSelectedContactValue("");
+    setSelectedId(null);
+  };
+
+  const handleStartConversation = (contactId: number) => {
+    setManualContactId(contactId);
+    setSelectedId(`user-${contactId}`);
+    setSelectedContactValue(String(contactId));
+    setDraft("");
+    setError(null);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const message = draft.trim();
@@ -152,34 +396,47 @@ export default function MessagesPage() {
       return;
     }
 
-    const nextMessage: Message = {
-      id: `local-${Date.now()}`,
-      author: "parent",
-      authorName: "Ty",
-      body: message,
-      sentAt: new Date().toISOString(),
-    };
+    try {
+      setSending(true);
 
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === selectedConversation.id
-          ? { ...conversation, messages: [...conversation.messages, nextMessage], unread: 0 }
-          : conversation,
-      ),
-    );
-    setDraft("");
+      const savedMessage = await apiPost<BackendMessage, CreateMessageRequest>(
+        "/api/users/messages/",
+        {
+          recipient: selectedConversation.recipientId,
+          body: message,
+        },
+      );
+
+      setBackendMessages((current) => [...current, savedMessage]);
+      setManualContactId(null);
+      setDraft("");
+      setError(null);
+    } catch (sendError) {
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Nie udało się wysłać wiadomości.",
+      );
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <TopBar />
+      <TopBar
+        childList={children}
+        selectedChild={selectedChild}
+        onSelectChild={handleSelectChild}
+        isAdmin={role === "ADMIN"}
+      />
 
       <main className="flex-1 p-4">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div>
             <h1 className="text-2xl font-bold">Wiadomości</h1>
             <p className="text-sm text-gray-600">
-              Rozmowy z nauczycielami i sekretariatem w jednym miejscu.
+              Rozmowy zapisane w systemie oraz kontakty dostępne dla Twojej roli.
             </p>
           </div>
 
@@ -189,22 +446,93 @@ export default function MessagesPage() {
             </div>
           )}
 
+          {role === "PARENT" && children.length > 0 && (
+            <div className="rounded border bg-white p-3">
+              <label htmlFor="child" className="text-sm font-medium text-gray-700">
+                Wybrane dziecko
+              </label>
+
+              <select
+                id="child"
+                className="form-input mt-2 max-w-sm"
+                value={selectedChild?.id ?? ""}
+                onChange={(event) => {
+                  const childId = Number(event.target.value);
+                  const child = children.find((item) => item.id === childId);
+
+                  if (child) {
+                    handleSelectChild(child);
+                  }
+                }}
+              >
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {child.first_name} {child.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid min-h-[620px] gap-4 lg:grid-cols-[320px_1fr]">
             <aside className="rounded border bg-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold">Rozmowy</h2>
-                <span className="text-sm text-gray-500">{children.length} dzieci</span>
+
+                <span className="text-sm text-gray-500">
+                  {role === "PARENT"
+                    ? selectedChild
+                      ? `${selectedChild.first_name} ${selectedChild.last_name}`
+                      : "brak dziecka"
+                    : role === "TEACHER"
+                      ? "konto nauczyciela"
+                      : "konto użytkownika"}
+                </span>
+              </div>
+
+              <div className="mt-3">
+                <label htmlFor="contact" className="text-sm font-medium text-gray-700">
+                  Nowa rozmowa
+                </label>
+
+                <select
+                  id="contact"
+                  className="form-input mt-1"
+                  value={selectedContactValue}
+                  onChange={(event) => {
+                    const contactId = Number(event.target.value);
+
+                    if (!contactId) {
+                      setSelectedContactValue("");
+                      return;
+                    }
+
+                    handleStartConversation(contactId);
+                  }}
+                  disabled={availableContacts.length === 0}
+                >
+                  <option value="">Wybierz kontakt</option>
+
+                  {availableContacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {getContactName(contact)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <input
                 className="form-input mt-3"
-                placeholder="Szukaj"
+                placeholder="Szukaj rozmowy"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
 
               <div className="mt-3 flex flex-col gap-2">
-                {loading && <div className="p-2 text-sm text-gray-600">Ładowanie...</div>}
+                {loading && (
+                  <div className="p-2 text-sm text-gray-600">Ładowanie...</div>
+                )}
+
                 {!loading &&
                   filteredConversations.map((conversation) => (
                     <button
@@ -215,65 +543,110 @@ export default function MessagesPage() {
                           ? "border-black bg-gray-100"
                           : "bg-white"
                       }`}
-                      onClick={() => setSelectedId(conversation.id)}
+                      onClick={() => {
+                        setSelectedId(conversation.id);
+                        setSelectedContactValue(String(conversation.recipientId));
+                      }}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-semibold">{conversation.title}</span>
+
                         {conversation.unread > 0 && (
                           <span className="rounded bg-gray-800 px-2 py-1 text-xs text-white">
                             {conversation.unread}
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 text-sm text-gray-600">{conversation.subtitle}</div>
+
+                      <div className="mt-1 text-sm text-gray-600">
+                        {conversation.subtitle}
+                      </div>
                     </button>
                   ))}
+
+                {!loading && filteredConversations.length === 0 && (
+                  <div className="p-2 text-sm text-gray-600">
+                    Brak rozmów do wyświetlenia. Wybierz kontakt z listy, aby rozpocząć.
+                  </div>
+                )}
               </div>
             </aside>
 
             <section className="flex min-h-[620px] flex-col rounded border bg-white">
               <div className="border-b p-4">
-                <h2 className="text-lg font-semibold">{selectedConversation?.title}</h2>
-                <div className="text-sm text-gray-600">{selectedConversation?.subtitle}</div>
+                <h2 className="text-lg font-semibold">
+                  {selectedConversation?.title ?? "Brak wybranej rozmowy"}
+                </h2>
+
+                <div className="text-sm text-gray-600">
+                  {selectedConversation?.subtitle ??
+                    "Wybierz rozmowę albo kontakt z listy po lewej stronie."}
+                </div>
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {selectedConversation?.messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.author === "parent" ? "justify-end" : "justify-start"}`}
+                    className={`flex ${
+                      message.author === "me" ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
                       className={`max-w-[75%] rounded border p-3 text-sm ${
-                        message.author === "parent" ? "bg-gray-900 text-white" : "bg-gray-50"
+                        message.author === "me"
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-50"
                       }`}
                     >
                       <div className="mb-1 text-xs opacity-80">
                         {message.authorName} - {formatDate(message.sentAt)}
                       </div>
+
                       <div>{message.body}</div>
                     </div>
                   </div>
                 ))}
+
+                {!selectedConversation && (
+                  <div className="text-sm text-gray-600">
+                    Brak aktywnej rozmowy.
+                  </div>
+                )}
+
+                {selectedConversation &&
+                  selectedConversation.messages.length === 0 && (
+                    <div className="text-sm text-gray-600">
+                      Brak wiadomości w tej rozmowie. Napisz pierwszą wiadomość.
+                    </div>
+                  )}
               </div>
 
               <form className="border-t p-4" onSubmit={handleSubmit}>
                 <label htmlFor="message" className="text-sm font-medium text-gray-700">
                   Nowa wiadomość
                 </label>
+
                 <div className="mt-2 flex flex-col gap-3 sm:flex-row">
                   <textarea
                     id="message"
                     className="form-input min-h-24 flex-1 resize-none"
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Napisz wiadomość"
+                    placeholder={
+                      selectedConversation
+                        ? "Napisz wiadomość"
+                        : "Najpierw wybierz rozmowę albo kontakt"
+                    }
+                    disabled={sending || !selectedConversation}
                   />
+
                   <button
                     type="submit"
-                    className="btn h-12 bg-gray-800 text-white hover:bg-gray-900"
+                    className="btn h-12 bg-gray-800 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={sending || !selectedConversation}
                   >
-                    Wyślij
+                    {sending ? "Wysyłanie..." : "Wyślij"}
                   </button>
                 </div>
               </form>

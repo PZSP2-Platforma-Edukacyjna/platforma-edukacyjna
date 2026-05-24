@@ -36,3 +36,27 @@ export async function apiGet<T>(path: string): Promise<T> {
 
   return response.json() as Promise<T>;
 }
+
+export async function apiPost<TResponse, TBody>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const token = getAccessToken();
+  const backendUrl = getBackendUrl();
+
+  const response = await fetch(`${backendUrl}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Błąd zapisu danych: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
