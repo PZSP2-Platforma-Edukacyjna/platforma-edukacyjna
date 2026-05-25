@@ -1,7 +1,6 @@
 "use client";
 
 import TopBar from "@/components/layout/TopBar";
-import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
@@ -65,74 +64,150 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
   return schedule;
 }
 
+function storeSelectedChildId(childId: number): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem("selectedChildId", String(childId));
+}
+
 export default function Dashboard() {
+  const [role, setRole] = useState<string | null>(null);
+
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [selectedChildCourses, setSelectedChildCourses] = useState<CourseListItem[]>([]);
+
   const [detailedCourse, setDetailedCourse] = useState<CourseDetailsData | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function getData() {
-      const role = getUserRole();
+      const currentRole = getUserRole();
+      const token = getAccessToken();
 
-      if (role === "ADMIN") {
+      setRole(currentRole);
+      setError(null);
+
+      if (currentRole === "ADMIN") {
         setIsAdmin(true);
         setLoading(false);
         return;
       }
 
-      const token = getAccessToken();
-
-      try {
-        const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
-          throw new Error("Failed to fetch data");
-        }
-
-        const childrenData = (await childrenRes.json()) as Child[];
-        const lessonsData = (await lessonsRes.json()) as Lesson[];
-        const teachersData = (await teachersRes.json()) as Teacher[];
-        const coursesData = (await coursesRes.json()) as CourseListItem[];
-
-        setChildren(childrenData);
-        setLessons(lessonsData);
-        setTeachers(teachersData);
-        setCourses(coursesData);
-
-        if (childrenData.length > 0) {
-          setSelectedChild(childrenData[0]);
-          setSchedule(processSchedule(lessonsData, childrenData[0].enrolled_courses, teachersData));
-        }
-      } catch (requestError: unknown) {
-        if (requestError instanceof Error) {
-          setError(requestError.message);
-        } else {
-          setError("An unknown error occurred");
-        }
-      } finally {
+      if (!token) {
+        setError("Brak tokenu logowania.");
         setLoading(false);
+        return;
       }
+
+      if (currentRole === "TEACHER") {
+        try {
+          const [lessonsRes, teachersRes] = await Promise.all([
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/teacher/schedule/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+
+          if (!lessonsRes.ok || !teachersRes.ok) {
+            throw new Error("Failed to fetch teacher data");
+          }
+
+          const lessonsData = (await lessonsRes.json()) as Lesson[];
+          const teachersData = (await teachersRes.json()) as Teacher[];
+
+          const teacherCourseIds = Array.from(
+            new Set(lessonsData.map((lesson) => lesson.course)),
+          );
+
+          setChildren([]);
+          setSelectedChild(null);
+          setLessons(lessonsData);
+          setTeachers(teachersData);
+          setCourses([]);
+          setSelectedChildCourses([]);
+          setSchedule(processSchedule(lessonsData, teacherCourseIds, teachersData));
+        } catch (requestError: unknown) {
+          if (requestError instanceof Error) {
+            setError(requestError.message);
+          } else {
+            setError("An unknown error occurred");
+          }
+        } finally {
+          setLoading(false);
+        }
+
+        return;
+      }
+
+      if (currentRole === "PARENT") {
+        try {
+          const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+
+          if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
+            throw new Error("Failed to fetch parent data");
+          }
+
+          const childrenData = (await childrenRes.json()) as Child[];
+          const lessonsData = (await lessonsRes.json()) as Lesson[];
+          const teachersData = (await teachersRes.json()) as Teacher[];
+          const coursesData = (await coursesRes.json()) as CourseListItem[];
+
+          setChildren(childrenData);
+          setLessons(lessonsData);
+          setTeachers(teachersData);
+          setCourses(coursesData);
+
+          if (childrenData.length > 0) {
+            const firstChild = childrenData[0];
+
+            setSelectedChild(firstChild);
+            storeSelectedChildId(firstChild.id);
+            setSchedule(processSchedule(lessonsData, firstChild.enrolled_courses, teachersData));
+          } else {
+            setSelectedChild(null);
+            setSchedule({});
+          }
+        } catch (requestError: unknown) {
+          if (requestError instanceof Error) {
+            setError(requestError.message);
+          } else {
+            setError("An unknown error occurred");
+          }
+        } finally {
+          setLoading(false);
+        }
+
+        return;
+      }
+
+      setError("Nieznana rola użytkownika.");
+      setLoading(false);
     }
 
     getData();
@@ -143,18 +218,28 @@ export default function Dashboard() {
       const childCourses = courses.filter((course) =>
         selectedChild.enrolled_courses.includes(course.id),
       );
+
       setSelectedChildCourses(childCourses);
+    } else {
+      setSelectedChildCourses([]);
     }
   }, [selectedChild, courses]);
 
   const handleSelectChild = (child: Child) => {
     setSelectedChild(child);
+    storeSelectedChildId(child.id);
+
     const newSchedule = processSchedule(lessons, child.enrolled_courses, teachers);
     setSchedule(newSchedule);
   };
 
   const handleCourseClick = async (course: CourseListItem) => {
     const token = getAccessToken();
+
+    if (!token) {
+      setError("Brak tokenu logowania.");
+      return;
+    }
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/${course.id}/`, {
@@ -195,11 +280,46 @@ export default function Dashboard() {
 
       <div className="flex flex-1 gap-4 p-4">
         <div className="flex flex-col flex-[4] gap-4">
-          {!isAdmin && (
+          {(role === "PARENT" || role === "TEACHER") && (
             <div className="card flex-[2] overflow-auto">
               {loading && <div>Ładowanie...</div>}
               {error && <div>Błąd: {error}</div>}
-              {!loading && !error && <ScheduleGrid schedule={schedule} />}
+
+              {!loading && !error && (
+                <>
+                  {role === "TEACHER" && (
+                    <div className="mb-3">
+                      <h2 className="text-xl font-semibold">Plan lekcji nauczyciela</h2>
+                    </div>
+                  )}
+
+                  {role === "PARENT" && (
+                    <div className="mb-3">
+                      <h2 className="text-xl font-semibold">Plan lekcji dziecka</h2>
+                    </div>
+                  )}
+
+                  <ScheduleGrid schedule={schedule} />
+                </>
+              )}
+            </div>
+          )}
+
+          {role === "ADMIN" && (
+            <div className="card flex-[2] overflow-auto">
+              <h2 className="text-xl font-semibold">Panel administratora</h2>
+              <p className="mt-2 text-gray-600">
+                Użyj panelu administracyjnego do zarządzania szkołą.
+              </p>
+            </div>
+          )}
+
+          {!loading && !role && (
+            <div className="card flex-[2] overflow-auto">
+              <h2 className="text-xl font-semibold">Brak roli użytkownika</h2>
+              <p className="mt-2 text-gray-600">
+                Nie udało się ustalić roli użytkownika.
+              </p>
             </div>
           )}
 
@@ -209,12 +329,17 @@ export default function Dashboard() {
             </div>
 
             <div className="flex-1">
-              <MessagesList />
+              <div className="card">
+                <h2 className="text-xl font-semibold">Wiadomości</h2>
+                <p className="mt-2 text-gray-600">
+                  Przejdź do zakładki Wiadomości, aby zobaczyć rozmowy.
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {!isAdmin && (
+        {role === "PARENT" && (
           <div className="flex-[1] max-w-[20%]">
             <SubjectsList
               courses={selectedChildCourses}
@@ -223,7 +348,8 @@ export default function Dashboard() {
             />
           </div>
         )}
-        {!isAdmin && detailedCourse && (
+
+        {role === "PARENT" && detailedCourse && (
           <CourseDetails course={detailedCourse} teachers={teachers} onClose={handleCloseDetails} />
         )}
       </div>

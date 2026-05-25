@@ -75,3 +75,25 @@ class AdminLessonViewSet(viewsets.ModelViewSet):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
     permission_classes = [IsAdmin]
+
+class TeacherScheduleView(generics.ListAPIView):
+    """
+    This view returns a list of all lessons for courses
+    taught by the currently authenticated teacher.
+    """
+
+    serializer_class = LessonSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role != "TEACHER":
+            return Lesson.objects.none()
+
+        return (
+            Lesson.objects
+            .filter(course__teacher=user)
+            .order_by("date")
+            .distinct()
+        )
