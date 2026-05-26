@@ -2,9 +2,10 @@ import React from "react";
 import ScheduleTile from "./ScheduleTile";
 
 export type Lesson = {
+  id?: number;
   subject: string;
   teacher: string;
-  status: "present" | "absent" | "excused";
+  status?: "present" | "absent" | "excused" | "default";
 };
 
 export type Schedule = Record<string, Record<number, Lesson>>;
@@ -13,26 +14,27 @@ const days = ["Pon", "Wt", "Śr", "Czw", "Pt"];
 
 type Props = {
   schedule: Schedule;
+  onSlotClick?: (dayIndex: number, hour: number, lesson?: Lesson) => void;
 };
 
-export default function ScheduleGrid({ schedule }: Props) {
-  const hours = Array.from({ length: 10 }, (_, i) => 8 + i);
+export default function ScheduleGrid({ schedule, onSlotClick }: Props) {
+  const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
 
   return (
     <div className="grid w-full grid-cols-[3rem_repeat(5,minmax(0,1fr))] gap-1 text-xs">
       <div></div>
 
       {days.map((day) => (
-        <div key={day} className="text-center font-semibold">
+        <div key={day} className="text-center font-semibold pb-2">
           {day}
         </div>
       ))}
 
       {hours.map((hour) => (
         <React.Fragment key={hour}>
-          <div className="self-start pr-2 pt-1 text-right">{hour}:00</div>
+          <div className="self-start pr-2 pt-1 text-right text-gray-500 font-medium">{hour}:00</div>
 
-          {days.map((day) => {
+          {days.map((day, dayIndex) => {
             const lesson = schedule[day]?.[hour];
 
             return (
@@ -41,6 +43,7 @@ export default function ScheduleGrid({ schedule }: Props) {
                 subject={lesson?.subject}
                 teacher={lesson?.teacher}
                 status={lesson?.status}
+                onClick={onSlotClick ? () => onSlotClick(dayIndex, hour, lesson) : undefined}
               />
             );
           })}
