@@ -6,8 +6,16 @@ import UsersAdmin from "./UsersAdmin";
 import LessonsAdmin from "./LessonsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
 
+type TabId = "users" | "lessons" | "schedule";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "users", label: "Użytkownicy" },
+  { id: "lessons", label: "Lekcje (Lista)" },
+  { id: "schedule", label: "Plan Lekcji" },
+];
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"users" | "lessons" | "schedule">("users");
+  const [activeTab, setActiveTab] = useState<TabId>("users");
 
   return (
     <div className="h-screen flex flex-col">
@@ -16,24 +24,19 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-bold">Panel Administratora</h1>
 
         <div className="flex gap-4 border-b pb-2">
-          <button
-            className={`font-semibold ${activeTab === "users" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("users")}
-          >
-            Użytkownicy
-          </button>
-          <button
-            className={`font-semibold ${activeTab === "lessons" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("lessons")}
-          >
-            Lekcje (Lista)
-          </button>
-          <button
-            className={`font-semibold ${activeTab === "schedule" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("schedule")}
-          >
-            Plan Lekcji
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`font-semibold border-b-2 px-1 pb-1 transition-all cursor-pointer ${
+                activeTab === tab.id
+                  ? "text-black border-black"
+                  : "text-gray-500 border-transparent hover:text-black hover:border-gray-300"
+              }`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <div className="flex-1 overflow-auto">
