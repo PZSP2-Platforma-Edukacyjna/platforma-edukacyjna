@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAccessToken } from "@/lib/auth";
+import AdminTable, { ColumnDef } from "@/components/ui/AdminTable";
 
 type User = {
   id: number;
@@ -126,48 +127,23 @@ export default function UsersAdmin() {
   if (loading) return <div>Ładowanie...</div>;
   if (error) return <div>Błąd: {error}</div>;
 
+  const columns: ColumnDef<User>[] = [
+    { header: "ID", render: (u) => u.id },
+    { header: "Email", render: (u) => u.email },
+    { header: "Imię i nazwisko", render: (u) => `${u.first_name} ${u.last_name}` },
+    { header: "Rola", render: (u) => u.role },
+  ];
+
   return (
     <div className="flex gap-8">
-      <div className="flex-[2]">
-        <h2 className="text-xl font-bold mb-4">Lista Użytkowników</h2>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b bg-gray-100">
-              <th className="p-2">ID</th>
-              <th className="p-2">Email</th>
-              <th className="p-2">Imię i nazwisko</th>
-              <th className="p-2">Rola</th>
-              <th className="p-2">Akcje</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b">
-                <td className="p-2">{user.id}</td>
-                <td className="p-2">{user.email}</td>
-                <td className="p-2">
-                  {user.first_name} {user.last_name}
-                </td>
-                <td className="p-2">{user.role}</td>
-                <td className="p-2 gap-2 flex">
-                  <button
-                    onClick={() => handleEdit(user)}
-                    className="text-blue-500 hover:underline"
-                  >
-                    Edytuj
-                  </button>
-                  <button
-                    onClick={() => handleDelete(user.id)}
-                    className="text-red-500 hover:underline"
-                  >
-                    Usuń
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <AdminTable
+        title="Lista Użytkowników"
+        data={users}
+        columns={columns}
+        keyExtractor={(u) => u.id}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
 
       <div className="flex-1 p-4 border rounded shadow bg-white h-fit">
         <h2 className="text-xl font-bold mb-4">

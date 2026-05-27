@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAccessToken } from "@/lib/auth";
+import AdminTable, { ColumnDef } from "@/components/ui/AdminTable";
 
 type Lesson = {
   id: number;
@@ -147,44 +148,22 @@ export default function LessonsAdmin() {
   if (loading) return <div>Ładowanie...</div>;
   if (error) return <div>Błąd: {error}</div>;
 
+  const columns: ColumnDef<Lesson>[] = [
+    { header: "Data i czas", render: (l) => new Date(l.date).toLocaleString() },
+    { header: "Kurs", render: (l) => l.course_name },
+    { header: "Temat", render: (l) => l.topic },
+  ];
+
   return (
     <div className="flex gap-8">
-      <div className="flex-[2]">
-        <h2 className="text-xl font-bold mb-4">Harmonogram (Lekcje)</h2>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b bg-gray-100">
-              <th className="p-2">Data i czas</th>
-              <th className="p-2">Kurs</th>
-              <th className="p-2">Temat</th>
-              <th className="p-2">Akcje</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lessons.map((lesson) => (
-              <tr key={lesson.id} className="border-b">
-                <td className="p-2">{new Date(lesson.date).toLocaleString()}</td>
-                <td className="p-2">{lesson.course_name}</td>
-                <td className="p-2">{lesson.topic}</td>
-                <td className="p-2 gap-2 flex">
-                  <button
-                    onClick={() => handleEdit(lesson)}
-                    className="text-blue-500 hover:underline"
-                  >
-                    Edytuj
-                  </button>
-                  <button
-                    onClick={() => handleDelete(lesson.id)}
-                    className="text-red-500 hover:underline"
-                  >
-                    Usuń
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <AdminTable
+        title="Harmonogram (Lekcje)"
+        data={lessons}
+        columns={columns}
+        keyExtractor={(l) => l.id}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
 
       <div className="flex-1 p-4 border rounded shadow bg-white h-fit">
         <h2 className="text-xl font-bold mb-4">
