@@ -9,11 +9,13 @@ from .views import (
     AdminStudentViewSet,
     AdminCourseViewSet,
     AdminLessonViewSet,
+    PaymentViewSet
 )
 
 router = DefaultRouter()
 router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'learning-materials', LearningMaterialViewSet, basename='learningmaterial')
+router.register(r'payments', PaymentViewSet, basename='payment'),
 
 admin_router = DefaultRouter()
 admin_router.register(r'students', AdminStudentViewSet, basename='admin-student')
@@ -25,6 +27,6 @@ urlpatterns = [
     path("my-children/schedule/", MyChildrenScheduleView.as_view(), name="my-children-schedule"),
     path("teacher/schedule/", TeacherScheduleView.as_view(), name="teacher-schedule"),
     path("manage/", include(admin_router.urls)),
-    path("", include(router.urls)),
+    path("", include(router.urls))
 ]
 

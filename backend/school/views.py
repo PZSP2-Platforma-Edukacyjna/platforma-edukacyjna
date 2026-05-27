@@ -1,12 +1,13 @@
 from rest_framework import generics, viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Student, Lesson, Course, LearningMaterial
+from .models import Student, Lesson, Course, LearningMaterial, Payment, User
 from .serializers import (
     StudentSerializer,
     LessonSerializer,
     CourseSerializer,
     CourseDetailSerializer,
     LearningMaterialSerializer,
+    PaymentSerializer
 )
 from .permissions import IsParent, IsAdmin
 
@@ -25,11 +26,6 @@ class MyChildrenView(generics.ListAPIView):
 
 
 class MyChildrenScheduleView(generics.ListAPIView):
-    """
-    This view returns a list of all lessons for all children
-    of the currently authenticated parent.
-    """
-
     serializer_class = LessonSerializer
     permission_classes = [IsAuthenticated, IsParent]
 
@@ -41,9 +37,6 @@ class MyChildrenScheduleView(generics.ListAPIView):
         )
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    A simple ViewSet for viewing courses.
-    """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
@@ -54,9 +47,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return CourseSerializer
 
 class LearningMaterialViewSet(viewsets.ModelViewSet):
-    """
-    A ViewSet for viewing and editing learning materials.
-    """
     queryset = LearningMaterial.objects.all()
     serializer_class = LearningMaterialSerializer
     permission_classes = [IsAuthenticated]
@@ -77,10 +67,6 @@ class AdminLessonViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdmin]
 
 class TeacherScheduleView(generics.ListAPIView):
-    """
-    This view returns a list of all lessons for courses
-    taught by the currently authenticated teacher.
-    """
 
     serializer_class = LessonSerializer
     permission_classes = [IsAuthenticated]
@@ -97,3 +83,13 @@ class TeacherScheduleView(generics.ListAPIView):
             .order_by("date")
             .distinct()
         )
+
+class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == User.Role.ADMIN:
+            return Payment.objects.all().order_by('-date')
+        return Payment.objects.filter(user=user).order_by('-date')

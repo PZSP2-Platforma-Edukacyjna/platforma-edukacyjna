@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Student, Lesson, Course, LearningMaterial
+from .models import Payment
 
 class LearningMaterialSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,3 +33,11 @@ class LessonSerializer(serializers.ModelSerializer):
 
     def get_teacher(self, obj):
         return obj.course.teacher.id
+
+class PaymentSerializer(serializers.ModelSerializer):
+    course_name = serializers.CharField(source='course.name', read_only=True)
+    course_code = serializers.CharField(source='course.course_code', read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = ['id', 'course', 'course_name', 'course_code', 'amount', 'status', 'date']
