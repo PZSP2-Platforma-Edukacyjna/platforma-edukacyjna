@@ -1,9 +1,11 @@
 import pytest
+from datetime import timedelta
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.factories import ParentFactory, TeacherFactory, AdminFactory
 from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory
-from school.models import Student
+from school.models import Student, Course
 
 pytestmark = pytest.mark.django_db
 
@@ -97,6 +99,34 @@ class TestSchoolAPI:
         assert len(data) == 1
         assert data[0]['id'] == lesson.id
 
+    def test_parent_schedule_does_not_duplicate_shared_family_course(self):
+        parent = ParentFactory()
+        first_child = StudentFactory(parent=parent)
+        second_child = StudentFactory(parent=parent)
+        course = CourseFactory()
+        course.students.add(first_child, second_child)
+        lesson = LessonFactory(course=course)
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/my-children/schedule/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [lesson.id]
+
+    def test_teacher_schedule_is_sorted_by_date(self):
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        later_lesson = LessonFactory(course=course, date=timezone.now() + timedelta(days=3))
+        earlier_lesson = LessonFactory(course=course, date=timezone.now() + timedelta(days=1))
+
+        self.client.force_authenticate(user=teacher)
+        response = self.client.get('/api/teacher/schedule/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [earlier_lesson.id, later_lesson.id]
+
     def test_admin_can_create_student(self):
         admin = AdminFactory()
         parent = ParentFactory()
@@ -133,6 +163,24 @@ class TestSchoolAPI:
 
         response = self.client.delete(f'/api/manage/courses/{course_id}/')
         assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Course.objects.filter(id=course_id).exists()
+
+    def test_non_admin_cannot_manage_courses(self):
+        teacher = TeacherFactory()
+        self.client.force_authenticate(user=teacher)
+
+        response = self.client.post(
+            '/api/manage/courses/',
+            {
+                'teacher': teacher.id,
+                'course_code': 'NOPE-101',
+                'name': 'Blocked Course',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert not Course.objects.filter(course_code='NOPE-101').exists()
 
     def test_admin_can_manage_lessons(self):
         admin = AdminFactory()

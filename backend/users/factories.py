@@ -5,12 +5,20 @@ from users.models import User, Message
 class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
+        skip_postgeneration_save = True
 
     username = factory.Sequence(lambda n: f"user{n}")
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
-    password = factory.PostGenerationMethodCall('set_password', 'testpassword123')
+
+    @factory.post_generation
+    def password(self, create, extracted, **kwargs):
+        raw_password = extracted or "testpassword123"
+        self.set_password(raw_password)
+
+        if create:
+            self.save(update_fields=["password"])
 
 class AdminFactory(UserFactory):
     role = User.Role.ADMIN
