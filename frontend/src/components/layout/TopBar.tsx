@@ -1,6 +1,6 @@
 "use client";
 
-import { logout } from "@/lib/auth";
+import { getUserRole, logout } from "@/lib/auth";
 import type { Child } from "@/types/school";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,12 +12,35 @@ type Props = {
   isAdmin?: boolean;
 };
 
-const navItems = [
-  { href: "/dashboard", label: "Panel" },
-  { href: "/messages", label: "Wiadomości" },
-  { href: "/payments", label: "Płatności" },
-  { href: "/account", label: "Konto" },
-];
+type NavItem = {
+  href: string;
+  label: string;
+};
+
+function getNavItems(role: string | null, isAdmin: boolean): NavItem[] {
+  if (isAdmin || role === "ADMIN") {
+    return [{ href: "/admin", label: "Panel Administratora" }];
+  }
+
+  if (role === "TEACHER") {
+    return [
+      { href: "/dashboard", label: "Panel" },
+      { href: "/messages", label: "Wiadomości" },
+      { href: "/account", label: "Konto" },
+    ];
+  }
+
+  if (role === "PARENT") {
+    return [
+      { href: "/dashboard", label: "Panel" },
+      { href: "/messages", label: "Wiadomości" },
+      { href: "/payments", label: "Płatności" },
+      { href: "/account", label: "Konto" },
+    ];
+  }
+
+  return [{ href: "/dashboard", label: "Panel" }];
+}
 
 export default function TopBar({
   childList = [],
@@ -27,7 +50,11 @@ export default function TopBar({
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const isOnAdminPage = pathname?.startsWith("/admin");
+
+  const role = getUserRole();
+  const navItems = getNavItems(role, isAdmin);
+
+  const shouldShowChildren = role === "PARENT" && childList.length > 0;
 
   const handleLogout = () => {
     logout();
@@ -37,7 +64,7 @@ export default function TopBar({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-white p-4">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-        {childList.length > 0 ? (
+        {shouldShowChildren ? (
           childList.map((child) => (
             <button
               key={child.id}
@@ -60,13 +87,10 @@ export default function TopBar({
       </div>
 
       <nav className="flex flex-wrap items-center gap-2">
-        {isAdmin && (
-          <Link href={isOnAdminPage ? "/dashboard" : "/admin"} className="btn h-10 bg-white">
-            {isOnAdminPage ? "Strona główna" : "Panel Administratora"}
-          </Link>
-        )}
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href ||
+            (item.href === "/admin" && pathname?.startsWith("/admin"));
 
           return (
             <Link
@@ -80,6 +104,7 @@ export default function TopBar({
             </Link>
           );
         })}
+
         <button type="button" className="btn h-10 bg-white" onClick={handleLogout}>
           Wyloguj
         </button>
