@@ -20,7 +20,13 @@ vi.mock("@/lib/auth", () => ({
 describe("MessagesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+    });
   });
 
   it("loads teacher conversations and sends a new message", async () => {
