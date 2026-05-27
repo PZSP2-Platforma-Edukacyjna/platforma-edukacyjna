@@ -1,9 +1,8 @@
 import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
-from django.urls import reverse
 from users.factories import ParentFactory, TeacherFactory, AdminFactory
-from school.factories import StudentFactory, CourseFactory, LessonFactory
+from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory
 from school.models import Student
 
 pytestmark = pytest.mark.django_db
@@ -113,3 +112,50 @@ class TestSchoolAPI:
         response = self.client.post('/api/manage/students/', payload)
         assert response.status_code == status.HTTP_201_CREATED
         assert Student.objects.filter(pesel="12345678901").exists()
+
+    def test_admin_can_manage_courses(self):
+        admin = AdminFactory()
+        teacher = TeacherFactory()
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "teacher": teacher.id,
+            "course_code": "NEW-101",
+            "name": "New Course"
+        }
+        response = self.client.post('/api/manage/courses/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+        course_id = response.json()['id']
+
+        response = self.client.patch(f'/api/manage/courses/{course_id}/', {"name": "Updated Name"})
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['name'] == "Updated Name"
+
+        response = self.client.delete(f'/api/manage/courses/{course_id}/')
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_admin_can_manage_lessons(self):
+        admin = AdminFactory()
+        course = CourseFactory()
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "course": course.id,
+            "topic": "Intro",
+            "date": "2026-06-01T10:00:00Z"
+        }
+        response = self.client.post('/api/manage/lessons/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_course_detail_includes_learning_materials(self):
+        user = TeacherFactory()
+        course = CourseFactory(teacher=user)
+        material = LearningMaterialFactory(course=course)
+
+        self.client.force_authenticate(user=user)
+        response = self.client.get(f'/api/courses/{course.id}/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert 'learning_materials' in data
+        assert len(data['learning_materials']) == 1
+        assert data['learning_materials'][0]['id'] == material.id
