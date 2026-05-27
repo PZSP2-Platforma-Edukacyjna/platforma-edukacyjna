@@ -1,3 +1,4 @@
 .direnv
 __pycache__
+.pytest_cache/
 /backend/db.sqlite3
