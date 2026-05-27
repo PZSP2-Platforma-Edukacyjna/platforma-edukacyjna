@@ -69,6 +69,7 @@ export default function TopBar({
             <button
               key={child.id}
               type="button"
+              aria-pressed={selectedChild?.id === child.id}
               className={`btn flex h-10 min-w-[100px] max-w-[150px] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap text-sm ${
                 selectedChild?.id === child.id
                   ? "border-black bg-gray-800 text-white hover:bg-gray-900"
@@ -96,6 +97,7 @@ export default function TopBar({
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={`btn flex h-10 items-center ${
                 isActive ? "border-black bg-gray-800 text-white hover:bg-gray-900" : "bg-white"
               }`}
