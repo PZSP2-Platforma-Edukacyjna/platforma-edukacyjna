@@ -1,6 +1,6 @@
 import factory
 from factory.django import DjangoModelFactory
-from users.models import User
+from users.models import User, Message
 
 class UserFactory(DjangoModelFactory):
     class Meta:
@@ -20,3 +20,11 @@ class TeacherFactory(UserFactory):
 
 class ParentFactory(UserFactory):
     role = User.Role.PARENT
+
+class MessageFactory(DjangoModelFactory):
+    class Meta:
+        model = Message
+
+    sender = factory.SubFactory(UserFactory)
+    recipient = factory.SubFactory(UserFactory)
+    body = factory.Faker("text")
