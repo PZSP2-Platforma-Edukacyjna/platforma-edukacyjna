@@ -5,6 +5,7 @@ import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
 import SubjectsList from "@/components/subjects/SubjectsList";
+import AttendanceModal from "@/components/schedule/AttendanceModal";
 import { getAccessToken, getUserRole } from "@/lib/auth";
 import type { Child, Lesson, Teacher } from "@/types/school";
 import { useEffect, useState } from "react";
@@ -55,9 +56,10 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
     const teacher = teachers.find((item) => item.id === lesson.teacher);
 
     schedule[day][hour] = {
+      id: lesson.id,
       subject: lesson.course_name,
       teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown",
-      status: "present",
+      status: undefined,
     };
   });
 
@@ -84,6 +86,10 @@ export default function Dashboard() {
   const [selectedChildCourses, setSelectedChildCourses] = useState<CourseListItem[]>([]);
 
   const [detailedCourse, setDetailedCourse] = useState<CourseDetailsData | null>(null);
+  const [selectedLessonForAttendance, setSelectedLessonForAttendance] = useState<{
+    lessonId: number;
+    courseId: number;
+  } | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
 
   const [loading, setLoading] = useState(true);
@@ -128,9 +134,7 @@ export default function Dashboard() {
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
 
-          const teacherCourseIds = Array.from(
-            new Set(lessonsData.map((lesson) => lesson.course)),
-          );
+          const teacherCourseIds = Array.from(new Set(lessonsData.map((lesson) => lesson.course)));
 
           setChildren([]);
           setSelectedChild(null);
@@ -269,6 +273,22 @@ export default function Dashboard() {
     setDetailedCourse(null);
   };
 
+  const handleLessonClick = (lessonData: import("@/components/schedule/ScheduleGrid").Lesson) => {
+    if (role === "TEACHER" && lessonData.id) {
+      const fullLesson = lessons.find((l) => l.id === lessonData.id);
+      if (fullLesson) {
+        setSelectedLessonForAttendance({
+          lessonId: fullLesson.id,
+          courseId: fullLesson.course,
+        });
+      }
+    }
+  };
+
+  const handleCloseAttendanceModal = () => {
+    setSelectedLessonForAttendance(null);
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <TopBar
@@ -299,7 +319,10 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <ScheduleGrid schedule={schedule} />
+                  <ScheduleGrid
+                    schedule={schedule}
+                    onLessonClick={role === "TEACHER" ? handleLessonClick : undefined}
+                  />
                 </>
               )}
             </div>
@@ -317,9 +340,7 @@ export default function Dashboard() {
           {!loading && !role && (
             <div className="card flex-[2] overflow-auto">
               <h2 className="text-xl font-semibold">Brak roli użytkownika</h2>
-              <p className="mt-2 text-gray-600">
-                Nie udało się ustalić roli użytkownika.
-              </p>
+              <p className="mt-2 text-gray-600">Nie udało się ustalić roli użytkownika.</p>
             </div>
           )}
 
@@ -351,6 +372,14 @@ export default function Dashboard() {
 
         {role === "PARENT" && detailedCourse && (
           <CourseDetails course={detailedCourse} teachers={teachers} onClose={handleCloseDetails} />
+        )}
+
+        {selectedLessonForAttendance && (
+          <AttendanceModal
+            lessonId={selectedLessonForAttendance.lessonId}
+            courseId={selectedLessonForAttendance.courseId}
+            onClose={handleCloseAttendanceModal}
+          />
         )}
       </div>
     </div>

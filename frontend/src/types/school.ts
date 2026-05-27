@@ -21,3 +21,11 @@ export type Lesson = {
   date: string;
   teacher: number;
 };
+
+export type Attendance = {
+  id: number;
+  lesson: number;
+  student: number;
+  status: "PRESENT" | "ABSENT" | "EXCUSED" | "LATE";
+  date_marked: string;
+};
