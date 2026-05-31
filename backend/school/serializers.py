@@ -21,7 +21,7 @@ class CourseDetailSerializer(CourseSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ['id', 'first_name', 'last_name', 'date_of_birth', 'enrolled_courses']
+        fields = ['id', 'first_name', 'last_name', 'pesel', 'date_of_birth', 'parent', 'enrolled_courses']
 
 class LessonSerializer(serializers.ModelSerializer):
     course_name = serializers.StringRelatedField(source='course')

@@ -1,0 +1,209 @@
+import pytest
+from datetime import timedelta
+from django.utils import timezone
+from rest_framework.test import APIClient
+from rest_framework import status
+from users.factories import ParentFactory, TeacherFactory, AdminFactory
+from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory
+from school.models import Student, Course
+
+pytestmark = pytest.mark.django_db
+
+class TestSchoolAPI:
+    def setup_method(self):
+        self.client = APIClient()
+
+    def test_unauthenticated_access_denied(self):
+        """All school endpoints should require authentication."""
+        urls = [
+            '/api/my-children/',
+            '/api/my-children/schedule/',
+            '/api/teacher/schedule/',
+            '/api/courses/',
+            '/api/manage/students/',
+        ]
+        for url in urls:
+            response = self.client.get(url)
+            assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_parent_access_control(self):
+        parent = ParentFactory()
+        other_parent = ParentFactory()
+        student = StudentFactory(parent=parent)
+        StudentFactory(parent=other_parent)
+
+        self.client.force_authenticate(user=parent)
+
+        response = self.client.get('/api/my-children/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == student.id
+
+        response = self.client.get('/api/teacher/schedule/')
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.json()) == 0
+
+        response = self.client.get('/api/manage/students/')
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_teacher_access_control(self):
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        lesson = LessonFactory(course=course)
+
+        other_teacher = TeacherFactory()
+        other_course = CourseFactory(teacher=other_teacher)
+        LessonFactory(course=other_course)
+
+        self.client.force_authenticate(user=teacher)
+
+        response = self.client.get('/api/teacher/schedule/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == lesson.id
+
+        response = self.client.get('/api/my-children/')
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_admin_access_control(self):
+        admin = AdminFactory()
+        StudentFactory()
+        CourseFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.get('/api/manage/students/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        if isinstance(data, dict) and 'results' in data:
+            results = data['results']
+        else:
+            results = data
+        assert len(results) >= 1
+
+    def test_parent_schedule(self):
+        parent = ParentFactory()
+        student = StudentFactory(parent=parent)
+        course = CourseFactory()
+        course.students.add(student)
+        lesson = LessonFactory(course=course)
+
+        LessonFactory()
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/my-children/schedule/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == lesson.id
+
+    def test_parent_schedule_does_not_duplicate_shared_family_course(self):
+        parent = ParentFactory()
+        first_child = StudentFactory(parent=parent)
+        second_child = StudentFactory(parent=parent)
+        course = CourseFactory()
+        course.students.add(first_child, second_child)
+        lesson = LessonFactory(course=course)
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/my-children/schedule/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [lesson.id]
+
+    def test_teacher_schedule_is_sorted_by_date(self):
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        later_lesson = LessonFactory(course=course, date=timezone.now() + timedelta(days=3))
+        earlier_lesson = LessonFactory(course=course, date=timezone.now() + timedelta(days=1))
+
+        self.client.force_authenticate(user=teacher)
+        response = self.client.get('/api/teacher/schedule/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [earlier_lesson.id, later_lesson.id]
+
+    def test_admin_can_create_student(self):
+        admin = AdminFactory()
+        parent = ParentFactory()
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "parent": parent.id,
+            "pesel": "12345678901",
+            "first_name": "Test",
+            "last_name": "Student",
+            "date_of_birth": "2015-01-01"
+        }
+        response = self.client.post('/api/manage/students/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+        assert Student.objects.filter(pesel="12345678901").exists()
+
+    def test_admin_can_manage_courses(self):
+        admin = AdminFactory()
+        teacher = TeacherFactory()
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "teacher": teacher.id,
+            "course_code": "NEW-101",
+            "name": "New Course"
+        }
+        response = self.client.post('/api/manage/courses/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+        course_id = response.json()['id']
+
+        response = self.client.patch(f'/api/manage/courses/{course_id}/', {"name": "Updated Name"})
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['name'] == "Updated Name"
+
+        response = self.client.delete(f'/api/manage/courses/{course_id}/')
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Course.objects.filter(id=course_id).exists()
+
+    def test_non_admin_cannot_manage_courses(self):
+        teacher = TeacherFactory()
+        self.client.force_authenticate(user=teacher)
+
+        response = self.client.post(
+            '/api/manage/courses/',
+            {
+                'teacher': teacher.id,
+                'course_code': 'NOPE-101',
+                'name': 'Blocked Course',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert not Course.objects.filter(course_code='NOPE-101').exists()
+
+    def test_admin_can_manage_lessons(self):
+        admin = AdminFactory()
+        course = CourseFactory()
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "course": course.id,
+            "topic": "Intro",
+            "date": "2026-06-01T10:00:00Z"
+        }
+        response = self.client.post('/api/manage/lessons/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_course_detail_includes_learning_materials(self):
+        user = TeacherFactory()
+        course = CourseFactory(teacher=user)
+        material = LearningMaterialFactory(course=course)
+
+        self.client.force_authenticate(user=user)
+        response = self.client.get(f'/api/courses/{course.id}/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert 'learning_materials' in data
+        assert len(data['learning_materials']) == 1
+        assert data['learning_materials'][0]['id'] == material.id

@@ -1,0 +1,79 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet, apiPost, ApiError } from "./api";
+import { getAccessToken } from "@/lib/auth";
+
+vi.mock("@/lib/auth", () => ({
+  getAccessToken: vi.fn(),
+}));
+
+describe("api helpers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000/";
+    vi.mocked(getAccessToken).mockReturnValue("access-token");
+  });
+
+  it("apiGet sends the access token and returns parsed JSON", async () => {
+    const responseBody = { id: 1, name: "Matematyka" };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseBody),
+    });
+
+    await expect(apiGet("/api/courses/")).resolves.toEqual(responseBody);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/api/courses/",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer access-token");
+  });
+
+  it("apiGet fails before fetch when backend URL is missing", async () => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = "";
+    global.fetch = vi.fn();
+
+    await expect(apiGet("/api/courses/")).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("apiGet exposes response status in ApiError", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+    });
+
+    await expect(apiGet("/api/manage/students/")).rejects.toEqual(
+      new ApiError("Nie udało się pobrać danych (403).", 403),
+    );
+  });
+
+  it("apiPost sends JSON body with authorization header", async () => {
+    const responseBody = { id: 10, body: "Dzień dobry" };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseBody),
+    });
+
+    await expect(
+      apiPost("/api/users/messages/", { recipient: 5, body: "Dzień dobry" }),
+    ).resolves.toEqual(responseBody);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/api/users/messages/",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer access-token",
+        },
+        body: JSON.stringify({ recipient: 5, body: "Dzień dobry" }),
+      }),
+    );
+  });
+});

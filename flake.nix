@@ -20,6 +20,10 @@
           })
           (ps.django-cors-headers.override { inherit django; })
           dj-database-url
+
+          ps.pytest
+          (ps.pytest-django.override { inherit django; })
+          ps.factory-boy
         ]);
       in {
         devShells.default = pkgs.mkShell {
