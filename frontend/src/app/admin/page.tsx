@@ -6,11 +6,13 @@ import UsersAdmin from "./UsersAdmin";
 import LessonsAdmin from "./LessonsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
 import PaymentsAdmin from "./PaymentsAdmin";
+import CoursesAdmin from "./CoursesAdmin";
 
-type TabId = "users" | "lessons" | "schedule" | "payments";
+type TabId = "users" | "courses" | "lessons" | "schedule" | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
+  { id: "courses", label: "Kursy" },
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
   { id: "payments", label: "Płatności" },
@@ -43,6 +45,7 @@ export default function AdminDashboard() {
 
         <div className="flex-1 overflow-auto">
           {activeTab === "users" && <UsersAdmin />}
+          {activeTab === "courses" && <CoursesAdmin />}
           {activeTab === "lessons" && <LessonsAdmin />}
           {activeTab === "schedule" && <ScheduleAdmin />}
           {activeTab === "payments" && <PaymentsAdmin />}
