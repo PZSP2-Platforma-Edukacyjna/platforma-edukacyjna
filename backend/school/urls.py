@@ -9,13 +9,15 @@ from .views import (
     AdminStudentViewSet,
     AdminCourseViewSet,
     AdminLessonViewSet,
-    PaymentViewSet
+    PaymentViewSet,
+    AttendanceViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'learning-materials', LearningMaterialViewSet, basename='learningmaterial')
-router.register(r'payments', PaymentViewSet, basename='payment'),
+router.register(r'payments', PaymentViewSet, basename='payment')
+router.register(r'attendances', AttendanceViewSet, basename='attendance')
 
 admin_router = DefaultRouter()
 admin_router.register(r'students', AdminStudentViewSet, basename='admin-student')
@@ -29,4 +31,3 @@ urlpatterns = [
     path("manage/", include(admin_router.urls)),
     path("", include(router.urls))
 ]
-

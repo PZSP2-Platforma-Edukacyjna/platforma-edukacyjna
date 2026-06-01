@@ -1,16 +1,58 @@
 from rest_framework import generics, viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Student, Lesson, Course, LearningMaterial, Payment, User
+from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, User
 from .serializers import (
     StudentSerializer,
     LessonSerializer,
     CourseSerializer,
     CourseDetailSerializer,
     LearningMaterialSerializer,
-    PaymentSerializer
+    PaymentSerializer,
+    AttendanceSerializer,
 )
-from .permissions import IsParent, IsAdmin
+from .permissions import IsParent, IsAdmin, IsTeacher
 
+class AttendanceViewSet(viewsets.ModelViewSet):
+    """
+    A ViewSet for viewing and editing attendances.
+    Only teachers can create/update attendances for their own courses.
+    Parents can view their children's attendances.
+    """
+    serializer_class = AttendanceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Attendance.objects.none()
+
+        if user.role == 'TEACHER':
+            queryset = Attendance.objects.filter(lesson__course__teacher=user)
+        elif user.role == 'PARENT':
+            queryset = Attendance.objects.filter(student__parent=user)
+        elif user.role == 'ADMIN':
+            queryset = Attendance.objects.all()
+
+        lesson_id = self.request.query_params.get('lesson')
+        if lesson_id is not None:
+            queryset = queryset.filter(lesson_id=lesson_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        lesson = serializer.validated_data['lesson']
+        if user.role != 'ADMIN' and lesson.course.teacher != user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to mark attendance for this lesson.")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        lesson = serializer.validated_data.get('lesson', serializer.instance.lesson)
+        if user.role != 'ADMIN' and lesson.course.teacher != user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to modify attendance for this lesson.")
+        serializer.save()
 
 class MyChildrenView(generics.ListAPIView):
     """
@@ -69,13 +111,10 @@ class AdminLessonViewSet(viewsets.ModelViewSet):
 class TeacherScheduleView(generics.ListAPIView):
 
     serializer_class = LessonSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsTeacher]
 
     def get_queryset(self):
         user = self.request.user
-
-        if user.role != "TEACHER":
-            return Lesson.objects.none()
 
         return (
             Lesson.objects

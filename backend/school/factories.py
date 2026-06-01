@@ -1,7 +1,7 @@
 import factory
 from factory.django import DjangoModelFactory
 from django.utils import timezone
-from school.models import Student, Course, Lesson, LearningMaterial
+from school.models import Student, Course, Lesson, LearningMaterial, Attendance
 from users.factories import ParentFactory, TeacherFactory
 
 class StudentFactory(DjangoModelFactory):
@@ -38,3 +38,11 @@ class LearningMaterialFactory(DjangoModelFactory):
     course = factory.SubFactory(CourseFactory)
     title = factory.Faker("sentence")
     url = factory.Faker("url")
+
+class AttendanceFactory(DjangoModelFactory):
+    class Meta:
+        model = Attendance
+
+    lesson = factory.SubFactory(LessonFactory)
+    student = factory.SubFactory(StudentFactory)
+    status = Attendance.Status.PRESENT

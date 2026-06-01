@@ -7,8 +7,9 @@ import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
 import SubjectsList from "@/components/subjects/SubjectsList";
+import AttendanceModal from "@/components/schedule/AttendanceModal";
 import { getAccessToken, getUserRole } from "@/lib/auth";
-import type { Child, Lesson, Teacher } from "@/types/school";
+import type { Attendance, Child, Lesson, Teacher } from "@/types/school";
 import { useEffect, useState } from "react";
 
 type LearningMaterial = {
@@ -40,7 +41,13 @@ const dayMapping: Record<number, string> = {
   6: "Sob",
 };
 
-function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher[]): Schedule {
+function processSchedule(
+  lessons: Lesson[],
+  courses: number[],
+  teachers: Teacher[],
+  attendances: Attendance[] = [],
+  studentId?: number,
+): Schedule {
   const schedule: Schedule = {};
 
   const filteredLessons = lessons.filter((lesson) => courses.includes(lesson.course));
@@ -56,10 +63,19 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
 
     const teacher = teachers.find((item) => item.id === lesson.teacher);
 
+    let status: "PRESENT" | "ABSENT" | "EXCUSED" | "LATE" | undefined = undefined;
+    if (studentId) {
+      const attendance = attendances.find((a) => a.lesson === lesson.id && a.student === studentId);
+      if (attendance) {
+        status = attendance.status;
+      }
+    }
+
     schedule[day][hour] = {
+      id: lesson.id,
       subject: lesson.course_name,
       teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown",
-      status: "present",
+      status: status,
     };
   });
 
@@ -108,7 +124,12 @@ export default function Dashboard() {
   const [selectedChildCourses, setSelectedChildCourses] = useState<CourseListItem[]>([]);
 
   const [detailedCourse, setDetailedCourse] = useState<CourseDetailsData | null>(null);
+  const [selectedLessonForAttendance, setSelectedLessonForAttendance] = useState<{
+    lessonId: number;
+    courseId: number;
+  } | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
+  const [attendances, setAttendances] = useState<Attendance[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +181,7 @@ export default function Dashboard() {
           setTeachers(teachersData);
           setCourses([]);
           setSelectedChildCourses([]);
+          setAttendances([]);
           setSchedule(processSchedule(lessonsData, teacherCourseIds, teachersData));
         } catch (requestError: unknown) {
           if (requestError instanceof Error) {
@@ -176,20 +198,24 @@ export default function Dashboard() {
 
       if (currentRole === "PARENT") {
         try {
-          const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-          ]);
+          const [childrenRes, lessonsRes, teachersRes, coursesRes, attendancesRes] =
+            await Promise.all([
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/attendances/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }).catch(() => null),
+            ]);
 
           if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
             throw new Error("Failed to fetch parent data");
@@ -199,11 +225,15 @@ export default function Dashboard() {
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
           const coursesData = (await coursesRes.json()) as CourseListItem[];
+          const attendancesData = attendancesRes?.ok
+            ? ((await attendancesRes.json()) as Attendance[])
+            : [];
 
           setChildren(childrenData);
           setLessons(lessonsData);
           setTeachers(teachersData);
           setCourses(coursesData);
+          setAttendances(attendancesData);
 
           if (childrenData.length > 0) {
             const initialSelectedChild = getInitialSelectedChild(childrenData);
@@ -212,7 +242,13 @@ export default function Dashboard() {
             if (initialSelectedChild) {
               storeSelectedChildId(initialSelectedChild.id);
               setSchedule(
-                processSchedule(lessonsData, initialSelectedChild.enrolled_courses, teachersData),
+                processSchedule(
+                  lessonsData,
+                  initialSelectedChild.enrolled_courses,
+                  teachersData,
+                  attendancesData,
+                  initialSelectedChild.id,
+                ),
               );
             }
           } else {
@@ -255,7 +291,13 @@ export default function Dashboard() {
     setSelectedChild(child);
     storeSelectedChildId(child.id);
 
-    const newSchedule = processSchedule(lessons, child.enrolled_courses, teachers);
+    const newSchedule = processSchedule(
+      lessons,
+      child.enrolled_courses,
+      teachers,
+      attendances,
+      child.id,
+    );
     setSchedule(newSchedule);
   };
 
@@ -295,6 +337,22 @@ export default function Dashboard() {
     setDetailedCourse(null);
   };
 
+  const handleLessonClick = (lessonData: import("@/components/schedule/ScheduleGrid").Lesson) => {
+    if (role === "TEACHER" && lessonData.id) {
+      const fullLesson = lessons.find((l) => l.id === lessonData.id);
+      if (fullLesson) {
+        setSelectedLessonForAttendance({
+          lessonId: fullLesson.id,
+          courseId: fullLesson.course,
+        });
+      }
+    }
+  };
+
+  const handleCloseAttendanceModal = () => {
+    setSelectedLessonForAttendance(null);
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <TopBar
@@ -325,7 +383,10 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <ScheduleGrid schedule={schedule} />
+                  <ScheduleGrid
+                    schedule={schedule}
+                    onLessonClick={role === "TEACHER" ? handleLessonClick : undefined}
+                  />
                 </>
               )}
             </div>
@@ -367,6 +428,14 @@ export default function Dashboard() {
 
         {role === "PARENT" && detailedCourse && (
           <CourseDetails course={detailedCourse} teachers={teachers} onClose={handleCloseDetails} />
+        )}
+
+        {selectedLessonForAttendance && (
+          <AttendanceModal
+            lessonId={selectedLessonForAttendance.lessonId}
+            courseId={selectedLessonForAttendance.courseId}
+            onClose={handleCloseAttendanceModal}
+          />
         )}
       </div>
     </div>

@@ -5,7 +5,7 @@ export type Lesson = {
   id?: number;
   subject: string;
   teacher: string;
-  status?: "present" | "absent" | "excused" | "default";
+  status?: "PRESENT" | "ABSENT" | "EXCUSED" | "LATE" | "default";
 };
 
 export type Schedule = Record<string, Record<number, Lesson>>;
@@ -15,9 +15,10 @@ const days = ["Pon", "Wt", "Śr", "Czw", "Pt"];
 type Props = {
   schedule: Schedule;
   onSlotClick?: (dayIndex: number, hour: number, lesson?: Lesson) => void;
+  onLessonClick?: (lesson: Lesson, day: string, hour: number) => void;
 };
 
-export default function ScheduleGrid({ schedule, onSlotClick }: Props) {
+export default function ScheduleGrid({ schedule, onSlotClick, onLessonClick }: Props) {
   const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
 
   return (
@@ -43,7 +44,13 @@ export default function ScheduleGrid({ schedule, onSlotClick }: Props) {
                 subject={lesson?.subject}
                 teacher={lesson?.teacher}
                 status={lesson?.status}
-                onClick={onSlotClick ? () => onSlotClick(dayIndex, hour, lesson) : undefined}
+                onClick={
+                  onSlotClick
+                    ? () => onSlotClick(dayIndex, hour, lesson)
+                    : lesson && onLessonClick
+                      ? () => onLessonClick(lesson, day, hour)
+                      : undefined
+                }
               />
             );
           })}

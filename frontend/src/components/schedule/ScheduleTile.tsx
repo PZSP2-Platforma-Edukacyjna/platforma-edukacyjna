@@ -1,8 +1,16 @@
 type Props = {
   subject?: string;
   teacher?: string;
-  status?: "present" | "absent" | "excused" | "default";
+  status?: "PRESENT" | "ABSENT" | "EXCUSED" | "LATE" | "default";
   onClick?: () => void;
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  PRESENT: "bg-green-500",
+  ABSENT: "bg-red-500",
+  EXCUSED: "bg-yellow-500",
+  LATE: "bg-orange-500",
+  default: "bg-blue-500",
 };
 
 export default function ScheduleTile({ subject, teacher, status = "default", onClick }: Props) {
@@ -21,10 +29,7 @@ export default function ScheduleTile({ subject, teacher, status = "default", onC
     );
   }
 
-  let color = "bg-blue-500";
-  if (status === "present") color = "bg-green-500";
-  if (status === "absent") color = "bg-red-500";
-  if (status === "excused") color = "bg-yellow-500";
+  const color = status ? STATUS_COLORS[status] || "bg-blue-500" : "bg-blue-500";
 
   return (
     <div
