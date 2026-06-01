@@ -5,95 +5,70 @@ import { apiGet } from "@/lib/api";
 import type { Child } from "@/types/school";
 import { useEffect, useMemo, useState } from "react";
 
-type PaymentStatus = "paid" | "due" | "planned" | "late";
+type BackendPaymentStatus = "PENDING" | "COMPLETED" | "FAILED";
 
-type Payment = {
-  id: string;
-  childId: number;
-  childName: string;
-  title: string;
-  dueDate: string;
-  amount: number;
-  status: PaymentStatus;
+type BackendPayment = {
+  id: number;
+  course: number;
+  course_name: string;
+  course_code: string;
+  amount: string;
+  status: BackendPaymentStatus;
+  date: string;
 };
 
-const fallbackChildren: Child[] = [
-  {
-    id: 1,
-    first_name: "Jan",
-    last_name: "Kowalski",
-    enrolled_courses: [1, 2, 3],
-  },
-];
-
-const statusLabels: Record<PaymentStatus, string> = {
-  due: "Do zapłaty",
-  late: "Po terminie",
-  paid: "Opłacone",
-  planned: "Zaplanowane",
+const statusLabels: Record<BackendPaymentStatus, string> = {
+  PENDING: "Oczekująca",
+  COMPLETED: "Zakończona",
+  FAILED: "Nieudana",
 };
 
-function buildPayments(children: Child[]): Payment[] {
-  const source = children.length > 0 ? children : fallbackChildren;
-  const now = new Date();
-  const monthName = new Intl.DateTimeFormat("pl-PL", { month: "long" }).format(now);
-  const year = now.getFullYear();
+function formatMoney(value: string | number): string {
+  const numericValue = typeof value === "string" ? Number(value) : value;
 
-  return source.flatMap((child, index) => {
-    const childName = `${child.first_name} ${child.last_name}`;
-    const dueDate = new Date(year, now.getMonth(), 28 - index).toISOString();
-    const paidDate = new Date(year, now.getMonth(), 8 + index).toISOString();
-
-    return [
-      {
-        id: `${child.id}-tuition`,
-        childId: child.id,
-        childName,
-        title: `Czesne - ${monthName}`,
-        dueDate,
-        amount: 180 + index * 20,
-        status: "due" as const,
-      },
-      {
-        id: `${child.id}-materials`,
-        childId: child.id,
-        childName,
-        title: "Materiały dydaktyczne",
-        dueDate: paidDate,
-        amount: 45,
-        status: "paid" as const,
-      },
-    ];
-  });
-}
-
-function formatMoney(value: number): string {
   return new Intl.NumberFormat("pl-PL", {
     style: "currency",
     currency: "PLN",
-  }).format(value);
+  }).format(numericValue);
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium" }).format(new Date(value));
+  return new Intl.DateTimeFormat("pl-PL", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getStatusClass(status: BackendPaymentStatus): string {
+  if (status === "COMPLETED") {
+    return "border-green-200 bg-green-50 text-green-700";
+  }
+
+  if (status === "FAILED") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  return "border-yellow-200 bg-yellow-50 text-yellow-700";
 }
 
 export default function PaymentsPage() {
   const [children, setChildren] = useState<Child[]>([]);
-  const [payments, setPayments] = useState<Payment[]>(buildPayments([]));
-  const [selectedChildId, setSelectedChildId] = useState<number | "all">("all");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [method, setMethod] = useState("Przelew online");
+  const [payments, setPayments] = useState<BackendPayment[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | "all">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadPaymentsContext() {
+    async function loadPayments() {
       try {
-        const childrenData = await apiGet<Child[]>("/api/my-children/");
+        const [paymentsData, childrenData] = await Promise.all([
+          apiGet<BackendPayment[]>("/api/payments/"),
+          apiGet<Child[]>("/api/my-children/"),
+        ]);
 
+        setPayments(paymentsData);
         setChildren(childrenData);
-        setPayments(buildPayments(childrenData));
+        setError(null);
       } catch (paymentsError) {
         setError(
           paymentsError instanceof Error
@@ -105,63 +80,56 @@ export default function PaymentsPage() {
       }
     }
 
-    loadPaymentsContext();
+    loadPayments();
   }, []);
 
   const visiblePayments = useMemo(() => {
-    if (selectedChildId === "all") {
+    if (selectedCourseId === "all") {
       return payments;
     }
 
-    return payments.filter((payment) => payment.childId === selectedChildId);
-  }, [payments, selectedChildId]);
+    return payments.filter((payment) => payment.course === selectedCourseId);
+  }, [payments, selectedCourseId]);
 
-  const unpaidPayments = visiblePayments.filter((payment) => payment.status !== "paid");
-  const selectedTotal = visiblePayments
-    .filter((payment) => selectedIds.includes(payment.id) && payment.status !== "paid")
-    .reduce((sum, payment) => sum + payment.amount, 0);
-  const outstandingTotal = unpaidPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const paidTotal = visiblePayments
-    .filter((payment) => payment.status === "paid")
-    .reduce((sum, payment) => sum + payment.amount, 0);
+  const courseOptions = useMemo(() => {
+    const coursesById = new Map<number, string>();
 
-  const togglePayment = (paymentId: string) => {
-    setSelectedIds((current) =>
-      current.includes(paymentId)
-        ? current.filter((id) => id !== paymentId)
-        : [...current, paymentId],
-    );
-  };
+    for (const payment of payments) {
+      coursesById.set(
+        payment.course,
+        `${payment.course_code} - ${payment.course_name}`,
+      );
+    }
 
-  const markSelectedAsPlanned = () => {
-    setPayments((current) =>
-      current.map((payment) =>
-        selectedIds.includes(payment.id) && payment.status !== "paid"
-          ? { ...payment, status: "planned" }
-          : payment,
-      ),
-    );
-    setSelectedIds([]);
-  };
+    return Array.from(coursesById.entries()).map(([id, label]) => ({
+      id,
+      label,
+    }));
+  }, [payments]);
 
-  const markSelectedAsPaid = () => {
-    setPayments((current) =>
-      current.map((payment) =>
-        selectedIds.includes(payment.id) ? { ...payment, status: "paid" } : payment,
-      ),
-    );
-    setSelectedIds([]);
-  };
+  const pendingTotal = visiblePayments
+    .filter((payment) => payment.status === "PENDING")
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+  const completedTotal = visiblePayments
+    .filter((payment) => payment.status === "COMPLETED")
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+  const failedTotal = visiblePayments
+    .filter((payment) => payment.status === "FAILED")
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <TopBar />
+      <TopBar childList={children} />
 
       <main className="flex-1 p-4">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div>
             <h1 className="text-2xl font-bold">Płatności</h1>
-            <p className="text-sm text-gray-600">Saldo, należności i historia wpłat dla dzieci.</p>
+            <p className="text-sm text-gray-600">
+              Historia płatności pobrana z backendu.
+            </p>
           </div>
 
           {error && (
@@ -172,140 +140,97 @@ export default function PaymentsPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             <section className="rounded border bg-white p-4">
-              <div className="text-sm text-gray-500">Do zapłaty</div>
-              <div className="mt-2 text-2xl font-bold">{formatMoney(outstandingTotal)}</div>
+              <div className="text-sm text-gray-500">Oczekujące</div>
+              <div className="mt-2 text-2xl font-bold">{formatMoney(pendingTotal)}</div>
             </section>
+
             <section className="rounded border bg-white p-4">
-              <div className="text-sm text-gray-500">Opłacone</div>
-              <div className="mt-2 text-2xl font-bold">{formatMoney(paidTotal)}</div>
+              <div className="text-sm text-gray-500">Zakończone</div>
+              <div className="mt-2 text-2xl font-bold">{formatMoney(completedTotal)}</div>
             </section>
+
             <section className="rounded border bg-white p-4">
-              <div className="text-sm text-gray-500">Wybrane</div>
-              <div className="mt-2 text-2xl font-bold">{formatMoney(selectedTotal)}</div>
+              <div className="text-sm text-gray-500">Nieudane</div>
+              <div className="mt-2 text-2xl font-bold">{formatMoney(failedTotal)}</div>
             </section>
           </div>
 
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_320px]">
-            <section className="min-w-0 rounded border bg-white p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Należności</h2>
-                <select
-                  className="form-input w-auto min-w-48"
-                  value={selectedChildId}
-                  onChange={(event) =>
-                    setSelectedChildId(
-                      event.target.value === "all" ? "all" : Number(event.target.value),
-                    )
-                  }
-                >
-                  <option value="all">Wszystkie dzieci</option>
-                  {children.map((child) => (
-                    <option key={child.id} value={child.id}>
-                      {child.first_name} {child.last_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <section className="min-w-0 rounded border bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Historia płatności</h2>
 
-              <div className="mt-4 max-w-full overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b bg-gray-100">
-                      <th className="p-2">Wybierz</th>
-                      <th className="p-2">Pozycja</th>
-                      <th className="p-2">Dziecko</th>
-                      <th className="p-2">Termin</th>
-                      <th className="p-2">Status</th>
-                      <th className="p-2 text-right">Kwota</th>
+              <select
+                className="form-input w-auto min-w-64"
+                value={selectedCourseId}
+                onChange={(event) =>
+                  setSelectedCourseId(
+                    event.target.value === "all" ? "all" : Number(event.target.value),
+                  )
+                }
+              >
+                <option value="all">Wszystkie kursy</option>
+
+                {courseOptions.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-4 max-w-full overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-100">
+                    <th className="p-2">Kurs</th>
+                    <th className="p-2">Kod</th>
+                    <th className="p-2">Data</th>
+                    <th className="p-2">Status</th>
+                    <th className="p-2 text-right">Kwota</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {loading && (
+                    <tr>
+                      <td className="p-3 text-gray-600" colSpan={5}>
+                        Ładowanie...
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {loading && (
-                      <tr>
-                        <td className="p-3 text-gray-600" colSpan={6}>
-                          Ładowanie...
+                  )}
+
+                  {!loading &&
+                    visiblePayments.map((payment) => (
+                      <tr key={payment.id} className="border-b">
+                        <td className="p-2 font-medium">{payment.course_name}</td>
+                        <td className="p-2">{payment.course_code}</td>
+                        <td className="p-2">{formatDate(payment.date)}</td>
+                        <td className="p-2">
+                          <span
+                            className={`rounded border px-2 py-1 text-xs ${getStatusClass(
+                              payment.status,
+                            )}`}
+                          >
+                            {statusLabels[payment.status]}
+                          </span>
+                        </td>
+                        <td className="p-2 text-right font-semibold">
+                          {formatMoney(payment.amount)}
                         </td>
                       </tr>
-                    )}
-                    {!loading &&
-                      visiblePayments.map((payment) => (
-                        <tr key={payment.id} className="border-b">
-                          <td className="p-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(payment.id)}
-                              disabled={payment.status === "paid"}
-                              onChange={() => togglePayment(payment.id)}
-                            />
-                          </td>
-                          <td className="p-2 font-medium">{payment.title}</td>
-                          <td className="p-2">{payment.childName}</td>
-                          <td className="p-2">{formatDate(payment.dueDate)}</td>
-                          <td className="p-2">
-                            <span className="rounded border px-2 py-1 text-xs">
-                              {statusLabels[payment.status]}
-                            </span>
-                          </td>
-                          <td className="p-2 text-right font-semibold">
-                            {formatMoney(payment.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                    ))}
 
-            <aside className="rounded border bg-white p-4">
-              <h2 className="text-lg font-semibold">Płatność</h2>
-
-              <label htmlFor="method" className="mt-4 block text-sm font-medium text-gray-700">
-                Metoda
-              </label>
-              <select
-                id="method"
-                className="form-input mt-2"
-                value={method}
-                onChange={(event) => setMethod(event.target.value)}
-              >
-                <option>Przelew online</option>
-                <option>Przelew tradycyjny</option>
-                <option>BLIK</option>
-              </select>
-
-              <div className="mt-4 rounded border bg-gray-50 p-3 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span>Wybrano</span>
-                  <span>{selectedIds.length}</span>
-                </div>
-                <div className="mt-2 flex justify-between gap-3 font-semibold">
-                  <span>Razem</span>
-                  <span>{formatMoney(selectedTotal)}</span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-2">
-                <button
-                  type="button"
-                  className="btn bg-gray-800 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={selectedTotal === 0}
-                  onClick={markSelectedAsPlanned}
-                >
-                  Zaplanuj płatność
-                </button>
-                <button
-                  type="button"
-                  className="btn bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={selectedTotal === 0}
-                  onClick={markSelectedAsPaid}
-                >
-                  Oznacz jako opłacone
-                </button>
-              </div>
-
-              <div className="mt-4 text-xs text-gray-500">Wybrana metoda: {method}</div>
-            </aside>
-          </div>
+                  {!loading && visiblePayments.length === 0 && (
+                    <tr>
+                      <td className="p-3 text-gray-600" colSpan={5}>
+                        Brak płatności do wyświetlenia.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </main>
     </div>
