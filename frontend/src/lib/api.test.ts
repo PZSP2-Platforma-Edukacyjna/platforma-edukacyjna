@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiGet, apiPost, ApiError } from "./api";
+import { apiGet, apiPatch, apiPost, ApiError } from "./api";
 import { getAccessToken } from "@/lib/auth";
 
 vi.mock("@/lib/auth", () => ({
@@ -99,5 +99,30 @@ describe("api helpers", () => {
     await expect(apiPost("/api/users/messages/", { body: "" })).rejects.toEqual(
       new ApiError("Błąd zapisu danych: 400 Bad request", 400),
     );
+  });
+
+  it("apiPatch sends JSON body with authorization header", async () => {
+    const responseBody = { id: 7, status: "COMPLETED" };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseBody),
+    });
+
+    await expect(apiPatch("/api/payments/7/", { status: "COMPLETED" })).resolves.toEqual(
+      responseBody,
+    );
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/api/payments/7/",
+      expect.objectContaining({
+        method: "PATCH",
+        headers: expect.any(Headers),
+        body: JSON.stringify({ status: "COMPLETED" }),
+      }),
+    );
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Headers;
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("Authorization")).toBe("Bearer access-token");
   });
 });

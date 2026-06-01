@@ -37,7 +37,29 @@ class LessonSerializer(serializers.ModelSerializer):
 class PaymentSerializer(serializers.ModelSerializer):
     course_name = serializers.CharField(source='course.name', read_only=True)
     course_code = serializers.CharField(source='course.course_code', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
-        fields = ['id', 'course', 'course_name', 'course_code', 'amount', 'status', 'date']
+        fields = [
+            'id',
+            'user',
+            'user_email',
+            'user_name',
+            'course',
+            'course_name',
+            'course_code',
+            'amount',
+            'status',
+            'date',
+        ]
+
+    def get_user_name(self, obj):
+        full_name = f'{obj.user.first_name} {obj.user.last_name}'.strip()
+        return full_name or obj.user.email
+
+class PaymentStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['status']

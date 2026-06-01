@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 
 type BackendPaymentStatus = "PENDING" | "COMPLETED" | "FAILED";
@@ -73,6 +73,8 @@ export default function PaymentsAdmin() {
   const [statusFilter, setStatusFilter] = useState<BackendPaymentStatus | "all">("all");
   const [courseFilter, setCourseFilter] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
+  const [savingPaymentId, setSavingPaymentId] = useState<number | null>(null);
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +136,32 @@ export default function PaymentsAdmin() {
 
   const failedCount = filteredPayments.filter((payment) => payment.status === "FAILED").length;
 
+  const handleStatusChange = async (paymentId: number, status: BackendPaymentStatus) => {
+    try {
+      setSavingPaymentId(paymentId);
+      setStatusUpdateError(null);
+
+      const updatedPayment = await apiPatch<BackendPayment, { status: BackendPaymentStatus }>(
+        `/api/payments/${paymentId}/`,
+        { status },
+      );
+
+      setPayments((currentPayments) =>
+        currentPayments.map((payment) =>
+          payment.id === paymentId ? { ...payment, ...updatedPayment } : payment,
+        ),
+      );
+    } catch (updateError) {
+      setStatusUpdateError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Nie udało się zmienić statusu płatności.",
+      );
+    } finally {
+      setSavingPaymentId(null);
+    }
+  };
+
   if (loading) {
     return <div>Ładowanie...</div>;
   }
@@ -150,6 +178,12 @@ export default function PaymentsAdmin() {
       {error && (
         <div className="rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
           {error}
+        </div>
+      )}
+
+      {statusUpdateError && (
+        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {statusUpdateError}
         </div>
       )}
 
@@ -225,6 +259,7 @@ export default function PaymentsAdmin() {
                 <th className="p-2">Kod</th>
                 <th className="p-2">Data</th>
                 <th className="p-2">Status</th>
+                <th className="p-2">Zmień status</th>
                 <th className="p-2 text-right">Kwota</th>
               </tr>
             </thead>
@@ -246,13 +281,28 @@ export default function PaymentsAdmin() {
                       {statusLabels[payment.status]}
                     </span>
                   </td>
+                  <td className="p-2">
+                    <select
+                      aria-label={`Zmień status płatności #${payment.id}`}
+                      className="form-input min-w-36"
+                      value={payment.status}
+                      disabled={savingPaymentId === payment.id}
+                      onChange={(event) =>
+                        handleStatusChange(payment.id, event.target.value as BackendPaymentStatus)
+                      }
+                    >
+                      <option value="PENDING">Oczekująca</option>
+                      <option value="COMPLETED">Zakończona</option>
+                      <option value="FAILED">Nieudana</option>
+                    </select>
+                  </td>
                   <td className="p-2 text-right font-semibold">{formatMoney(payment.amount)}</td>
                 </tr>
               ))}
 
               {filteredPayments.length === 0 && (
                 <tr>
-                  <td className="p-3 text-gray-600" colSpan={7}>
+                  <td className="p-3 text-gray-600" colSpan={8}>
                     Brak płatności do wyświetlenia.
                   </td>
                 </tr>

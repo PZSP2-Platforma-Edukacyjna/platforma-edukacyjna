@@ -4,7 +4,13 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.factories import ParentFactory, TeacherFactory, AdminFactory
-from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory
+from school.factories import (
+    StudentFactory,
+    CourseFactory,
+    LessonFactory,
+    LearningMaterialFactory,
+    PaymentFactory,
+)
 from school.models import Student, Course
 
 pytestmark = pytest.mark.django_db
@@ -207,3 +213,49 @@ class TestSchoolAPI:
         assert 'learning_materials' in data
         assert len(data['learning_materials']) == 1
         assert data['learning_materials'][0]['id'] == material.id
+
+    def test_parent_can_view_only_own_payments(self):
+        parent = ParentFactory()
+        other_parent = ParentFactory()
+        own_payment = PaymentFactory(user=parent)
+        PaymentFactory(user=other_parent)
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/payments/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == own_payment.id
+        assert data[0]['user_email'] == parent.email
+
+    def test_admin_can_update_payment_status(self):
+        admin = AdminFactory()
+        payment = PaymentFactory(status='PENDING')
+
+        self.client.force_authenticate(user=admin)
+        response = self.client.patch(
+            f'/api/payments/{payment.id}/',
+            {'status': 'COMPLETED'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        payment.refresh_from_db()
+        assert payment.status == 'COMPLETED'
+        assert response.json()['status'] == 'COMPLETED'
+
+    def test_parent_cannot_update_payment_status(self):
+        parent = ParentFactory()
+        payment = PaymentFactory(user=parent, status='PENDING')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.patch(
+            f'/api/payments/{payment.id}/',
+            {'status': 'COMPLETED'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        payment.refresh_from_db()
+        assert payment.status == 'PENDING'

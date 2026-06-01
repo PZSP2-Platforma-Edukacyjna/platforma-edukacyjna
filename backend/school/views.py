@@ -1,5 +1,7 @@
 from rest_framework import generics, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from .models import Student, Lesson, Course, LearningMaterial, Payment, User
 from .serializers import (
     StudentSerializer,
@@ -7,7 +9,8 @@ from .serializers import (
     CourseSerializer,
     CourseDetailSerializer,
     LearningMaterialSerializer,
-    PaymentSerializer
+    PaymentSerializer,
+    PaymentStatusSerializer
 )
 from .permissions import IsParent, IsAdmin
 
@@ -84,12 +87,24 @@ class TeacherScheduleView(generics.ListAPIView):
             .distinct()
         )
 
-class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
+class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
+    http_method_names = ['get', 'patch', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
         if user.role == User.Role.ADMIN:
             return Payment.objects.all().order_by('-date')
         return Payment.objects.filter(user=user).order_by('-date')
+
+    def partial_update(self, request, *args, **kwargs):
+        if request.user.role != User.Role.ADMIN:
+            raise PermissionDenied("Only administrators can update payment status.")
+
+        payment = self.get_object()
+        serializer = PaymentStatusSerializer(payment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(PaymentSerializer(payment, context=self.get_serializer_context()).data)
