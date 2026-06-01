@@ -3,8 +3,37 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PaymentsPage from "./page";
 import { apiGet } from "@/lib/api";
 
+type ChildStub = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  enrolled_courses: number[];
+};
+
 vi.mock("@/components/layout/TopBar", () => ({
-  default: () => <nav>TopBar</nav>,
+  default: ({
+    childList = [],
+    selectedChild = null,
+    onSelectChild = () => {},
+  }: {
+    childList?: ChildStub[];
+    selectedChild?: ChildStub | null;
+    onSelectChild?: (child: ChildStub) => void;
+  }) => (
+    <nav>
+      <span>TopBar</span>
+      {childList.map((child) => (
+        <button
+          key={child.id}
+          type="button"
+          aria-pressed={selectedChild?.id === child.id}
+          onClick={() => onSelectChild(child)}
+        >
+          {child.first_name} {child.last_name}
+        </button>
+      ))}
+    </nav>
+  ),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -47,12 +76,25 @@ describe("PaymentsPage", () => {
       id: 10,
       first_name: "Ala",
       last_name: "Nowak",
-      enrolled_courses: [1, 2],
+      enrolled_courses: [101, 102],
+    },
+    {
+      id: 11,
+      first_name: "Ola",
+      last_name: "Nowak",
+      enrolled_courses: [103],
     },
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+    });
     vi.mocked(apiGet).mockImplementation((path) => {
       if (path === "/api/payments/") {
         return Promise.resolve(payments);
@@ -79,7 +121,7 @@ describe("PaymentsPage", () => {
     expect(within(table).getByText("MAT-1")).toBeInTheDocument();
     expect(within(table).getByText("Oczekująca")).toBeInTheDocument();
     expect(within(table).getByText("Zakończona")).toBeInTheDocument();
-    expect(within(table).getByText("Nieudana")).toBeInTheDocument();
+    expect(within(table).queryByText("Nieudana")).not.toBeInTheDocument();
   });
 
   it("filters payment history by course", async () => {
@@ -93,6 +135,20 @@ describe("PaymentsPage", () => {
     expect(within(table).getByText("Fizyka")).toBeInTheDocument();
     expect(within(table).queryByText("Matematyka")).not.toBeInTheDocument();
     expect(within(table).queryByText("Chemia")).not.toBeInTheDocument();
+  });
+
+  it("filters payment history when the selected child changes", async () => {
+    render(<PaymentsPage />);
+
+    const table = screen.getByRole("table");
+    expect(await within(table).findByText("Matematyka")).toBeInTheDocument();
+    expect(within(table).queryByText("Chemia")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ola Nowak" }));
+
+    expect(await within(table).findByText("Chemia")).toBeInTheDocument();
+    expect(within(table).queryByText("Matematyka")).not.toBeInTheDocument();
+    expect(window.localStorage.setItem).toHaveBeenCalledWith("selectedChildId", "11");
   });
 
   it("shows backend errors and an empty payment table", async () => {

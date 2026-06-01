@@ -39,6 +39,36 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+function getStoredSelectedChildId(): number | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const value = window.localStorage.getItem("selectedChildId");
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function storeSelectedChildId(childId: number): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem("selectedChildId", String(childId));
+}
+
+function getInitialSelectedChild(children: Child[]): Child | null {
+  const storedChildId = getStoredSelectedChildId();
+
+  return children.find((child) => child.id === storedChildId) ?? children[0] ?? null;
+}
+
 function getStatusClass(status: BackendPaymentStatus): string {
   if (status === "COMPLETED") {
     return "border-green-200 bg-green-50 text-green-700";
@@ -53,6 +83,7 @@ function getStatusClass(status: BackendPaymentStatus): string {
 
 export default function PaymentsPage() {
   const [children, setChildren] = useState<Child[]>([]);
+  const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [payments, setPayments] = useState<BackendPayment[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<number | "all">("all");
   const [loading, setLoading] = useState(true);
@@ -63,11 +94,12 @@ export default function PaymentsPage() {
       try {
         const [paymentsData, childrenData] = await Promise.all([
           apiGet<BackendPayment[]>("/api/payments/"),
-          apiGet<Child[]>("/api/my-children/"),
+          apiGet<Child[]>("/api/my-children/").catch(() => []),
         ]);
 
         setPayments(paymentsData);
         setChildren(childrenData);
+        setSelectedChild(getInitialSelectedChild(childrenData));
         setError(null);
       } catch (paymentsError) {
         setError(
@@ -83,29 +115,42 @@ export default function PaymentsPage() {
     loadPayments();
   }, []);
 
-  const visiblePayments = useMemo(() => {
-    if (selectedCourseId === "all") {
+  const childScopedPayments = useMemo(() => {
+    if (!selectedChild) {
       return payments;
     }
 
-    return payments.filter((payment) => payment.course === selectedCourseId);
-  }, [payments, selectedCourseId]);
+    const childCourseIds = new Set(selectedChild.enrolled_courses);
+
+    return payments.filter((payment) => childCourseIds.has(payment.course));
+  }, [payments, selectedChild]);
+
+  const visiblePayments = useMemo(() => {
+    if (selectedCourseId === "all") {
+      return childScopedPayments;
+    }
+
+    return childScopedPayments.filter((payment) => payment.course === selectedCourseId);
+  }, [childScopedPayments, selectedCourseId]);
 
   const courseOptions = useMemo(() => {
     const coursesById = new Map<number, string>();
 
-    for (const payment of payments) {
-      coursesById.set(
-        payment.course,
-        `${payment.course_code} - ${payment.course_name}`,
-      );
+    for (const payment of childScopedPayments) {
+      coursesById.set(payment.course, `${payment.course_code} - ${payment.course_name}`);
     }
 
     return Array.from(coursesById.entries()).map(([id, label]) => ({
       id,
       label,
     }));
-  }, [payments]);
+  }, [childScopedPayments]);
+
+  const handleSelectChild = (child: Child) => {
+    setSelectedChild(child);
+    storeSelectedChildId(child.id);
+    setSelectedCourseId("all");
+  };
 
   const pendingTotal = visiblePayments
     .filter((payment) => payment.status === "PENDING")
@@ -121,15 +166,17 @@ export default function PaymentsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <TopBar childList={children} />
+      <TopBar
+        childList={children}
+        selectedChild={selectedChild}
+        onSelectChild={handleSelectChild}
+      />
 
       <main className="flex-1 p-4">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div>
             <h1 className="text-2xl font-bold">Płatności</h1>
-            <p className="text-sm text-gray-600">
-              Historia płatności pobrana z backendu.
-            </p>
+            <p className="text-sm text-gray-600">Historia płatności pobrana z backendu.</p>
           </div>
 
           {error && (

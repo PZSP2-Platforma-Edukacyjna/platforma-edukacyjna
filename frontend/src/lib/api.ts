@@ -37,25 +37,31 @@ export async function apiGet<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function apiPost<TResponse, TBody>(
-  path: string,
-  body: TBody,
-): Promise<TResponse> {
-  const token = getAccessToken();
+export async function apiPost<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
   const backendUrl = getBackendUrl();
+
+  if (!backendUrl) {
+    throw new ApiError("Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.");
+  }
+
+  const token = getAccessToken();
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
   const response = await fetch(`${backendUrl}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Błąd zapisu danych: ${response.status} ${errorText}`);
+    throw new ApiError(`Błąd zapisu danych: ${response.status} ${errorText}`, response.status);
   }
 
   return response.json();
