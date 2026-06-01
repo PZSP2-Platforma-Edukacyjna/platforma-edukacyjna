@@ -1,6 +1,8 @@
 "use client";
 
+import AdminPanel from "@/app/admin/AdminPanel";
 import TopBar from "@/components/layout/TopBar";
+import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
@@ -72,6 +74,28 @@ function storeSelectedChildId(childId: number): void {
   window.localStorage.setItem("selectedChildId", String(childId));
 }
 
+function getStoredSelectedChildId(): number | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const value = window.localStorage.getItem("selectedChildId");
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getInitialSelectedChild(children: Child[]): Child | null {
+  const storedChildId = getStoredSelectedChildId();
+
+  return children.find((child) => child.id === storedChildId) ?? children[0] ?? null;
+}
+
 export default function Dashboard() {
   const [role, setRole] = useState<string | null>(null);
 
@@ -128,9 +152,7 @@ export default function Dashboard() {
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
 
-          const teacherCourseIds = Array.from(
-            new Set(lessonsData.map((lesson) => lesson.course)),
-          );
+          const teacherCourseIds = Array.from(new Set(lessonsData.map((lesson) => lesson.course)));
 
           setChildren([]);
           setSelectedChild(null);
@@ -184,11 +206,15 @@ export default function Dashboard() {
           setCourses(coursesData);
 
           if (childrenData.length > 0) {
-            const firstChild = childrenData[0];
+            const initialSelectedChild = getInitialSelectedChild(childrenData);
 
-            setSelectedChild(firstChild);
-            storeSelectedChildId(firstChild.id);
-            setSchedule(processSchedule(lessonsData, firstChild.enrolled_courses, teachersData));
+            setSelectedChild(initialSelectedChild);
+            if (initialSelectedChild) {
+              storeSelectedChildId(initialSelectedChild.id);
+              setSchedule(
+                processSchedule(lessonsData, initialSelectedChild.enrolled_courses, teachersData),
+              );
+            }
           } else {
             setSelectedChild(null);
             setSchedule({});
@@ -306,20 +332,15 @@ export default function Dashboard() {
           )}
 
           {role === "ADMIN" && (
-            <div className="card flex-[2] overflow-auto">
-              <h2 className="text-xl font-semibold">Panel administratora</h2>
-              <p className="mt-2 text-gray-600">
-                Użyj panelu administracyjnego do zarządzania szkołą.
-              </p>
+            <div className="flex-[2] overflow-auto rounded border bg-white p-4">
+              <AdminPanel />
             </div>
           )}
 
           {!loading && !role && (
             <div className="card flex-[2] overflow-auto">
               <h2 className="text-xl font-semibold">Brak roli użytkownika</h2>
-              <p className="mt-2 text-gray-600">
-                Nie udało się ustalić roli użytkownika.
-              </p>
+              <p className="mt-2 text-gray-600">Nie udało się ustalić roli użytkownika.</p>
             </div>
           )}
 
@@ -329,12 +350,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex-1">
-              <div className="card">
-                <h2 className="text-xl font-semibold">Wiadomości</h2>
-                <p className="mt-2 text-gray-600">
-                  Przejdź do zakładki Wiadomości, aby zobaczyć rozmowy.
-                </p>
-              </div>
+              <MessagesList />
             </div>
           </div>
         </div>

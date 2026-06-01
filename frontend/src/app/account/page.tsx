@@ -2,7 +2,7 @@
 
 import TopBar from "@/components/layout/TopBar";
 import { apiGet } from "@/lib/api";
-import { logout } from "@/lib/auth";
+import { getUserRole, logout } from "@/lib/auth";
 import { formatTokenDate, getAccessTokenPayload } from "@/lib/session";
 import type { AccessTokenPayload } from "@/lib/session";
 import type { Child, Lesson } from "@/types/school";
@@ -22,12 +22,21 @@ export default function AccountPage() {
   const router = useRouter();
   const [children, setChildren] = useState<Child[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [role, setRole] = useState<string | null>(null);
   const [tokenPayload, setTokenPayload] = useState<AccessTokenPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const currentRole = getUserRole();
+
+    setRole(currentRole);
     setTokenPayload(getAccessTokenPayload());
+
+    if (currentRole !== "PARENT") {
+      setLoading(false);
+      return;
+    }
 
     async function loadAccountData() {
       try {
@@ -90,7 +99,7 @@ export default function AccountPage() {
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+          <div className={`grid gap-4 ${role === "PARENT" ? "lg:grid-cols-[1fr_1.4fr]" : ""}`}>
             <section className="rounded border bg-white p-4">
               <h2 className="text-lg font-semibold">Profil i sesja</h2>
               <div className="mt-4 grid gap-3 text-sm">
@@ -101,6 +110,10 @@ export default function AccountPage() {
                 <div className="flex justify-between gap-4 border-b pb-2">
                   <span className="text-gray-500">Typ tokenu</span>
                   <span className="font-medium">{tokenPayload?.token_type ?? "Brak danych"}</span>
+                </div>
+                <div className="flex justify-between gap-4 border-b pb-2">
+                  <span className="text-gray-500">Rola</span>
+                  <span className="font-medium">{role ?? "Brak danych"}</span>
                 </div>
                 <div className="flex justify-between gap-4 border-b pb-2">
                   <span className="text-gray-500">Aktywna do</span>
@@ -115,63 +128,67 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="rounded border bg-white p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Dzieci pod opieką</h2>
-                <span className="rounded border px-3 py-1 text-sm">
-                  {courseCount} aktywnych kursów
-                </span>
-              </div>
+            {role === "PARENT" && (
+              <section className="rounded border bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold">Dzieci pod opieką</h2>
+                  <span className="rounded border px-3 py-1 text-sm">
+                    {courseCount} aktywnych kursów
+                  </span>
+                </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {loading && <div className="text-sm text-gray-600">Ładowanie...</div>}
-                {!loading &&
-                  children.map((child) => (
-                    <div key={child.id} className="rounded border p-3">
-                      <div className="font-semibold">
-                        {child.first_name} {child.last_name}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {loading && <div className="text-sm text-gray-600">Ładowanie...</div>}
+                  {!loading &&
+                    children.map((child) => (
+                      <div key={child.id} className="rounded border p-3">
+                        <div className="font-semibold">
+                          {child.first_name} {child.last_name}
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600">
+                          Data urodzenia: {formatDate(child.date_of_birth)}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Kursy: {child.enrolled_courses.length}
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm text-gray-600">
-                        Data urodzenia: {formatDate(child.date_of_birth)}
+                    ))}
+                  {!loading && children.length === 0 && (
+                    <div className="text-sm text-gray-600">Brak dzieci przypisanych do konta.</div>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <div className={`grid gap-4 ${role === "PARENT" ? "lg:grid-cols-[1.2fr_1fr]" : ""}`}>
+            {role === "PARENT" && (
+              <section className="rounded border bg-white p-4">
+                <h2 className="text-lg font-semibold">Najbliższe zajęcia</h2>
+                <div className="mt-4 divide-y">
+                  {upcomingLessons.map((lesson) => (
+                    <div
+                      key={lesson.id}
+                      className="flex flex-wrap justify-between gap-3 py-3 text-sm"
+                    >
+                      <div>
+                        <div className="font-medium">{lesson.course_name}</div>
+                        <div className="text-gray-600">{lesson.topic}</div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Kursy: {child.enrolled_courses.length}
+                      <div className="text-right text-gray-600">
+                        {new Intl.DateTimeFormat("pl-PL", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(lesson.date))}
                       </div>
                     </div>
                   ))}
-                {!loading && children.length === 0 && (
-                  <div className="text-sm text-gray-600">Brak dzieci przypisanych do konta.</div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-            <section className="rounded border bg-white p-4">
-              <h2 className="text-lg font-semibold">Najbliższe zajęcia</h2>
-              <div className="mt-4 divide-y">
-                {upcomingLessons.map((lesson) => (
-                  <div
-                    key={lesson.id}
-                    className="flex flex-wrap justify-between gap-3 py-3 text-sm"
-                  >
-                    <div>
-                      <div className="font-medium">{lesson.course_name}</div>
-                      <div className="text-gray-600">{lesson.topic}</div>
-                    </div>
-                    <div className="text-right text-gray-600">
-                      {new Intl.DateTimeFormat("pl-PL", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(lesson.date))}
-                    </div>
-                  </div>
-                ))}
-                {!loading && upcomingLessons.length === 0 && (
-                  <div className="py-3 text-sm text-gray-600">Brak nadchodzących zajęć.</div>
-                )}
-              </div>
-            </section>
+                  {!loading && upcomingLessons.length === 0 && (
+                    <div className="py-3 text-sm text-gray-600">Brak nadchodzących zajęć.</div>
+                  )}
+                </div>
+              </section>
+            )}
 
             <section className="rounded border bg-white p-4">
               <h2 className="text-lg font-semibold">Szybkie akcje</h2>
@@ -179,9 +196,11 @@ export default function AccountPage() {
                 <Link className="btn bg-white text-center" href="/messages">
                   Otwórz wiadomości
                 </Link>
-                <Link className="btn bg-white text-center" href="/payments">
-                  Przejdź do płatności
-                </Link>
+                {role === "PARENT" && (
+                  <Link className="btn bg-white text-center" href="/payments">
+                    Przejdź do płatności
+                  </Link>
+                )}
                 <Link className="btn bg-white text-center" href="/dashboard">
                   Wróć do panelu
                 </Link>
