@@ -31,11 +31,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             queryset = Attendance.objects.filter(student__parent=user)
         elif user.role == 'ADMIN':
             queryset = Attendance.objects.all()
-            
+
         lesson_id = self.request.query_params.get('lesson')
         if lesson_id is not None:
             queryset = queryset.filter(lesson_id=lesson_id)
-            
+
         return queryset
 
     def perform_create(self, serializer):

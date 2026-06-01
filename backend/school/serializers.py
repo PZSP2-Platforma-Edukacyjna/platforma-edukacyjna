@@ -6,6 +6,17 @@ class AttendanceSerializer(serializers.ModelSerializer):
         model = Attendance
         fields = ['id', 'lesson', 'student', 'status', 'date_marked']
 
+    def validate(self, attrs):
+        lesson = attrs.get('lesson', self.instance.lesson if self.instance else None)
+        student = attrs.get('student', self.instance.student if self.instance else None)
+
+        if lesson and student and not lesson.course.students.filter(pk=student.pk).exists():
+            raise serializers.ValidationError(
+                "Student is not enrolled in the lesson course."
+            )
+
+        return attrs
+
 class LearningMaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningMaterial
@@ -31,7 +42,9 @@ class CourseDetailSerializer(CourseSerializer):
     def get_students(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            if request.user.role in ['ADMIN', 'TEACHER']:
+            if request.user.role == 'ADMIN' or (
+                request.user.role == 'TEACHER' and obj.teacher_id == request.user.id
+            ):
                 return StudentSerializer(obj.students.all(), many=True).data
         return []
 

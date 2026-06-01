@@ -80,7 +80,11 @@ export default function AttendanceModal({ lessonId, courseId, onClose }: Props) 
   useEffect(() => {
     async function fetchData() {
       const token = getAccessToken();
-      if (!token) return;
+      if (!token) {
+        setError("Brak tokenu logowania.");
+        setLoading(false);
+        return;
+      }
 
       try {
         const [courseRes, attendancesRes] = await Promise.all([
@@ -127,7 +131,10 @@ export default function AttendanceModal({ lessonId, courseId, onClose }: Props) 
 
   const handleStatusChange = async (studentId: number, status: string) => {
     const token = getAccessToken();
-    if (!token) return;
+    if (!token) {
+      setError("Brak tokenu logowania.");
+      return;
+    }
 
     const existingAttendance = attendances[studentId];
     const method = existingAttendance ? "PUT" : "POST";

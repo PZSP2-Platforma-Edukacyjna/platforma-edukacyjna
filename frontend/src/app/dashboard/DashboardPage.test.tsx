@@ -79,4 +79,40 @@ describe("Dashboard Page - Parent Attendance", () => {
       expect(presentIndicator).toBeInTheDocument();
     });
   });
+
+  it("keeps the parent dashboard usable when attendance data cannot be fetched", async () => {
+    const mockChildren = [
+      { id: 1, first_name: "Jan", last_name: "Kowalski", enrolled_courses: [10] },
+    ];
+    const mockLessons = [
+      { id: 100, course: 10, course_name: "Matematyka", date: "2026-06-01T10:00:00Z", teacher: 2 },
+    ];
+    const mockTeachers = [{ id: 2, first_name: "Anna", last_name: "Nowak" }];
+    const mockCourses = [
+      { id: 10, course_code: "MAT", name: "Matematyka", description: "", teacher: 2 },
+    ];
+
+    vi.mocked(global.fetch).mockImplementation((url) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/api/my-children/schedule/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockLessons) } as Response);
+      if (urlStr.includes("/api/my-children/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockChildren) } as Response);
+      if (urlStr.includes("/api/users/teachers/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTeachers) } as Response);
+      if (urlStr.includes("/api/courses/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCourses) } as Response);
+      if (urlStr.includes("/api/attendances/")) return Promise.reject(new Error("Unavailable"));
+      return Promise.reject(new Error(`Unknown URL: ${urlStr}`));
+    });
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Ładowanie...")).not.toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText("Matematyka").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Failed to fetch parent data/)).not.toBeInTheDocument();
+  });
 });

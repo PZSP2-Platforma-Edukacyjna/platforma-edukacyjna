@@ -26,6 +26,19 @@ describe("AttendanceModal", () => {
     expect(screen.getByText("Ładowanie...")).toBeInTheDocument();
   });
 
+  it("shows an error instead of loading forever when token is missing", async () => {
+    vi.mocked(auth.getAccessToken).mockReturnValue(null);
+
+    render(<AttendanceModal lessonId={1} courseId={1} onClose={mockOnClose} />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Ładowanie...")).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Brak tokenu logowania.")).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("fetches and displays course info and students", async () => {
     const mockCourse = {
       name: "Matematyka",

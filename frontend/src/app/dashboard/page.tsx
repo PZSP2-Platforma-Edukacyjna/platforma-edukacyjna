@@ -1,13 +1,14 @@
 "use client";
 
 import TopBar from "@/components/layout/TopBar";
+import AdminPanel from "@/app/admin/AdminPanel";
 import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
 import SubjectsList from "@/components/subjects/SubjectsList";
 import AttendanceModal from "@/components/schedule/AttendanceModal";
 import { getAccessToken, getUserRole } from "@/lib/auth";
-import type { Child, Lesson, Teacher } from "@/types/school";
+import type { Attendance, Child, Lesson, Teacher } from "@/types/school";
 import { useEffect, useState } from "react";
 
 type LearningMaterial = {
@@ -43,7 +44,7 @@ function processSchedule(
   lessons: Lesson[],
   courses: number[],
   teachers: Teacher[],
-  attendances: import("@/types/school").Attendance[] = [],
+  attendances: Attendance[] = [],
   studentId?: number,
 ): Schedule {
   const schedule: Schedule = {};
@@ -88,6 +89,28 @@ function storeSelectedChildId(childId: number): void {
   window.localStorage.setItem("selectedChildId", String(childId));
 }
 
+function getStoredSelectedChildId(): number | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const value = window.localStorage.getItem("selectedChildId");
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getInitialSelectedChild(children: Child[]): Child | null {
+  const storedChildId = getStoredSelectedChildId();
+
+  return children.find((child) => child.id === storedChildId) ?? children[0] ?? null;
+}
+
 export default function Dashboard() {
   const [role, setRole] = useState<string | null>(null);
 
@@ -105,7 +128,7 @@ export default function Dashboard() {
     courseId: number;
   } | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
-  const [attendances, setAttendances] = useState<import("@/types/school").Attendance[]>([]);
+  const [attendances, setAttendances] = useState<Attendance[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,16 +213,10 @@ export default function Dashboard() {
               }),
               fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/attendances/`, {
                 headers: { Authorization: `Bearer ${token}` },
-              }),
+              }).catch(() => null),
             ]);
 
-          if (
-            !childrenRes.ok ||
-            !lessonsRes.ok ||
-            !teachersRes.ok ||
-            !coursesRes.ok ||
-            !attendancesRes.ok
-          ) {
+          if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
             throw new Error("Failed to fetch parent data");
           }
 
@@ -207,8 +224,9 @@ export default function Dashboard() {
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
           const coursesData = (await coursesRes.json()) as CourseListItem[];
-          const attendancesData =
-            (await attendancesRes.json()) as import("@/types/school").Attendance[];
+          const attendancesData = attendancesRes?.ok
+            ? ((await attendancesRes.json()) as Attendance[])
+            : [];
 
           setChildren(childrenData);
           setLessons(lessonsData);
@@ -217,19 +235,21 @@ export default function Dashboard() {
           setAttendances(attendancesData);
 
           if (childrenData.length > 0) {
-            const firstChild = childrenData[0];
+            const initialSelectedChild = getInitialSelectedChild(childrenData);
 
-            setSelectedChild(firstChild);
-            storeSelectedChildId(firstChild.id);
-            setSchedule(
-              processSchedule(
-                lessonsData,
-                firstChild.enrolled_courses,
-                teachersData,
-                attendancesData,
-                firstChild.id,
-              ),
-            );
+            setSelectedChild(initialSelectedChild);
+            if (initialSelectedChild) {
+              storeSelectedChildId(initialSelectedChild.id);
+              setSchedule(
+                processSchedule(
+                  lessonsData,
+                  initialSelectedChild.enrolled_courses,
+                  teachersData,
+                  attendancesData,
+                  initialSelectedChild.id,
+                ),
+              );
+            }
           } else {
             setSelectedChild(null);
             setSchedule({});
@@ -372,11 +392,8 @@ export default function Dashboard() {
           )}
 
           {role === "ADMIN" && (
-            <div className="card flex-[2] overflow-auto">
-              <h2 className="text-xl font-semibold">Panel administratora</h2>
-              <p className="mt-2 text-gray-600">
-                Użyj panelu administracyjnego do zarządzania szkołą.
-              </p>
+            <div className="flex-[2] overflow-auto rounded border bg-white p-4">
+              <AdminPanel />
             </div>
           )}
 
