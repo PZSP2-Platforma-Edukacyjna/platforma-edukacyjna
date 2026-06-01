@@ -2,7 +2,6 @@
 
 import TopBar from "@/components/layout/TopBar";
 import AdminPanel from "@/app/admin/AdminPanel";
-import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
@@ -411,7 +410,12 @@ export default function Dashboard() {
             </div>
 
             <div className="flex-1">
-              <MessagesList />
+              <div className="card">
+                <h2 className="text-xl font-semibold">Wiadomości</h2>
+                <p className="mt-2 text-gray-600">
+                  Przejdź do zakładki Wiadomości, aby zobaczyć rozmowy.
+                </p>
+              </div>
             </div>
           </div>
         </div>
