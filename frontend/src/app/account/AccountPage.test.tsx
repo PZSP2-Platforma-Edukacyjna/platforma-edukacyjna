@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AccountPage from "./page";
 import { apiGet } from "@/lib/api";
-import { logout } from "@/lib/auth";
+import { getUserRole, logout } from "@/lib/auth";
 import { formatTokenDate, getAccessTokenPayload } from "@/lib/session";
 
 const pushMock = vi.fn();
@@ -22,6 +22,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
+  getUserRole: vi.fn(),
   logout: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ vi.mock("@/lib/session", () => ({
 describe("AccountPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getUserRole).mockReturnValue("PARENT");
     vi.mocked(getAccessTokenPayload).mockReturnValue({
       user_id: 7,
       token_type: "access",
@@ -76,6 +78,7 @@ describe("AccountPage", () => {
 
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("access")).toBeInTheDocument();
+    expect(screen.getByText("PARENT")).toBeInTheDocument();
     expect(screen.getByText("1 sty 2030, 12:00")).toBeInTheDocument();
     expect(screen.getByText("Ala Nowak")).toBeInTheDocument();
     expect(screen.getByText("Matematyka")).toBeInTheDocument();
@@ -89,5 +92,16 @@ describe("AccountPage", () => {
 
     expect(logout).toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledWith("/login");
+  });
+
+  it("does not call parent-only endpoints for teacher accounts", async () => {
+    vi.mocked(getUserRole).mockReturnValue("TEACHER");
+
+    render(<AccountPage />);
+
+    expect(await screen.findByText("TEACHER")).toBeInTheDocument();
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(screen.queryByText("Dzieci pod opieką")).not.toBeInTheDocument();
+    expect(screen.queryByText("Przejdź do płatności")).not.toBeInTheDocument();
   });
 });

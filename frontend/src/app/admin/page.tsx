@@ -5,13 +5,15 @@ import { useState } from "react";
 import UsersAdmin from "./UsersAdmin";
 import LessonsAdmin from "./LessonsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
+import PaymentsAdmin from "./PaymentsAdmin";
 
-type TabId = "users" | "lessons" | "schedule";
+type TabId = "users" | "lessons" | "schedule" | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
+  { id: "payments", label: "Płatności" },
 ];
 
 export default function AdminDashboard() {
@@ -43,6 +45,7 @@ export default function AdminDashboard() {
           {activeTab === "users" && <UsersAdmin />}
           {activeTab === "lessons" && <LessonsAdmin />}
           {activeTab === "schedule" && <ScheduleAdmin />}
+          {activeTab === "payments" && <PaymentsAdmin />}
         </div>
       </div>
     </div>

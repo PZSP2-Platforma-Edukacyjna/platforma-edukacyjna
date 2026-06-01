@@ -68,12 +68,36 @@ describe("api helpers", () => {
       "http://localhost:8000/api/users/messages/",
       expect.objectContaining({
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer access-token",
-        },
+        headers: expect.any(Headers),
         body: JSON.stringify({ recipient: 5, body: "Dzień dobry" }),
       }),
+    );
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Headers;
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("Authorization")).toBe("Bearer access-token");
+  });
+
+  it("apiPost fails before fetch when backend URL is missing", async () => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = "";
+    global.fetch = vi.fn();
+
+    await expect(apiPost("/api/users/messages/", { body: "Test" })).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("apiPost exposes response status in ApiError", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue("Bad request"),
+    });
+
+    await expect(apiPost("/api/users/messages/", { body: "" })).rejects.toEqual(
+      new ApiError("Błąd zapisu danych: 400 Bad request", 400),
     );
   });
 });
