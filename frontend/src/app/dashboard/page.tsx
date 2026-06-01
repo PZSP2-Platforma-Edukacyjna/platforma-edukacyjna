@@ -39,7 +39,13 @@ const dayMapping: Record<number, string> = {
   6: "Sob",
 };
 
-function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher[]): Schedule {
+function processSchedule(
+  lessons: Lesson[],
+  courses: number[],
+  teachers: Teacher[],
+  attendances: import("@/types/school").Attendance[] = [],
+  studentId?: number,
+): Schedule {
   const schedule: Schedule = {};
 
   const filteredLessons = lessons.filter((lesson) => courses.includes(lesson.course));
@@ -55,11 +61,19 @@ function processSchedule(lessons: Lesson[], courses: number[], teachers: Teacher
 
     const teacher = teachers.find((item) => item.id === lesson.teacher);
 
+    let status: "PRESENT" | "ABSENT" | "EXCUSED" | "LATE" | undefined = undefined;
+    if (studentId) {
+      const attendance = attendances.find((a) => a.lesson === lesson.id && a.student === studentId);
+      if (attendance) {
+        status = attendance.status;
+      }
+    }
+
     schedule[day][hour] = {
       id: lesson.id,
       subject: lesson.course_name,
       teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown",
-      status: undefined,
+      status: status,
     };
   });
 
@@ -91,6 +105,7 @@ export default function Dashboard() {
     courseId: number;
   } | null>(null);
   const [schedule, setSchedule] = useState<Schedule>({});
+  const [attendances, setAttendances] = useState<import("@/types/school").Attendance[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +157,7 @@ export default function Dashboard() {
           setTeachers(teachersData);
           setCourses([]);
           setSelectedChildCourses([]);
+          setAttendances([]);
           setSchedule(processSchedule(lessonsData, teacherCourseIds, teachersData));
         } catch (requestError: unknown) {
           if (requestError instanceof Error) {
@@ -158,22 +174,32 @@ export default function Dashboard() {
 
       if (currentRole === "PARENT") {
         try {
-          const [childrenRes, lessonsRes, teachersRes, coursesRes] = await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-          ]);
+          const [childrenRes, lessonsRes, teachersRes, coursesRes, attendancesRes] =
+            await Promise.all([
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-children/schedule/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/attendances/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+            ]);
 
-          if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
+          if (
+            !childrenRes.ok ||
+            !lessonsRes.ok ||
+            !teachersRes.ok ||
+            !coursesRes.ok ||
+            !attendancesRes.ok
+          ) {
             throw new Error("Failed to fetch parent data");
           }
 
@@ -181,18 +207,29 @@ export default function Dashboard() {
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
           const coursesData = (await coursesRes.json()) as CourseListItem[];
+          const attendancesData =
+            (await attendancesRes.json()) as import("@/types/school").Attendance[];
 
           setChildren(childrenData);
           setLessons(lessonsData);
           setTeachers(teachersData);
           setCourses(coursesData);
+          setAttendances(attendancesData);
 
           if (childrenData.length > 0) {
             const firstChild = childrenData[0];
 
             setSelectedChild(firstChild);
             storeSelectedChildId(firstChild.id);
-            setSchedule(processSchedule(lessonsData, firstChild.enrolled_courses, teachersData));
+            setSchedule(
+              processSchedule(
+                lessonsData,
+                firstChild.enrolled_courses,
+                teachersData,
+                attendancesData,
+                firstChild.id,
+              ),
+            );
           } else {
             setSelectedChild(null);
             setSchedule({});
@@ -233,7 +270,13 @@ export default function Dashboard() {
     setSelectedChild(child);
     storeSelectedChildId(child.id);
 
-    const newSchedule = processSchedule(lessons, child.enrolled_courses, teachers);
+    const newSchedule = processSchedule(
+      lessons,
+      child.enrolled_courses,
+      teachers,
+      attendances,
+      child.id,
+    );
     setSchedule(newSchedule);
   };
 

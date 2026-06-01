@@ -23,13 +23,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Attendance.objects.none()
+
         if user.role == 'TEACHER':
-            return Attendance.objects.filter(lesson__course__teacher=user)
+            queryset = Attendance.objects.filter(lesson__course__teacher=user)
         elif user.role == 'PARENT':
-            return Attendance.objects.filter(student__parent=user)
+            queryset = Attendance.objects.filter(student__parent=user)
         elif user.role == 'ADMIN':
-            return Attendance.objects.all()
-        return Attendance.objects.none()
+            queryset = Attendance.objects.all()
+            
+        lesson_id = self.request.query_params.get('lesson')
+        if lesson_id is not None:
+            queryset = queryset.filter(lesson_id=lesson_id)
+            
+        return queryset
 
     def perform_create(self, serializer):
         user = self.request.user

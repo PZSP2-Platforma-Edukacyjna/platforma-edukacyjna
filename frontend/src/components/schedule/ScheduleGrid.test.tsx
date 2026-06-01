@@ -5,11 +5,11 @@ import ScheduleGrid, { Schedule } from "./ScheduleGrid";
 describe("ScheduleGrid", () => {
   const mockSchedule: Schedule = {
     Pon: {
-      8: { subject: "Matematyka", teacher: "Jan Kowalski", status: "present" },
-      9: { subject: "Fizyka", teacher: "Anna Nowak", status: "absent" },
+      8: { id: 1, subject: "Matematyka", teacher: "Jan Kowalski", status: "PRESENT" },
+      9: { id: 2, subject: "Fizyka", teacher: "Anna Nowak", status: "ABSENT" },
     },
     Wt: {
-      10: { subject: "Chemia", teacher: "Piotr Wiśniewski", status: "excused" },
+      10: { id: 3, subject: "Chemia", teacher: "Piotr Wiśniewski", status: "EXCUSED" },
     },
   };
 
@@ -44,14 +44,17 @@ describe("ScheduleGrid", () => {
 
   it("calls onSlotClick when a tile is clicked", () => {
     const onSlotClick = vi.fn();
-    const mockSchedule: Schedule = {
-      Pon: {
-        8: { subject: "Math", teacher: "Teacher", status: "present" },
-      },
-    };
     render(<ScheduleGrid schedule={mockSchedule} onSlotClick={onSlotClick} />);
 
-    fireEvent.click(screen.getByText("Math").closest("div")!);
+    fireEvent.click(screen.getByText("Matematyka").closest("div")!);
     expect(onSlotClick).toHaveBeenCalledWith(0, 8, mockSchedule["Pon"][8]);
+  });
+
+  it("calls onLessonClick when a tile is clicked and no onSlotClick is provided", () => {
+    const onLessonClick = vi.fn();
+    render(<ScheduleGrid schedule={mockSchedule} onLessonClick={onLessonClick} />);
+
+    fireEvent.click(screen.getByText("Matematyka").closest("div")!);
+    expect(onLessonClick).toHaveBeenCalledWith(mockSchedule["Pon"][8], "Pon", 8);
   });
 });

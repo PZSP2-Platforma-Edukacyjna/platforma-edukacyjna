@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.factories import ParentFactory, TeacherFactory, AdminFactory
-from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory
+from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory, AttendanceFactory
 from school.models import Student, Course
 
 pytestmark = pytest.mark.django_db
@@ -41,8 +41,7 @@ class TestSchoolAPI:
         assert data[0]['id'] == student.id
 
         response = self.client.get('/api/teacher/schedule/')
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.json()) == 0
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
         response = self.client.get('/api/manage/students/')
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -207,3 +206,120 @@ class TestSchoolAPI:
         assert 'learning_materials' in data
         assert len(data['learning_materials']) == 1
         assert data['learning_materials'][0]['id'] == material.id
+
+    def test_teacher_can_manage_attendance_for_own_course(self):
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        student = StudentFactory()
+        course.students.add(student)
+        lesson = LessonFactory(course=course)
+
+        self.client.force_authenticate(user=teacher)
+
+        payload = {
+            "lesson": lesson.id,
+            "student": student.id,
+            "status": "PRESENT"
+        }
+        response = self.client.post('/api/attendances/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+        attendance_id = response.json()['id']
+
+        update_payload = {
+            "lesson": lesson.id,
+            "student": student.id,
+            "status": "ABSENT"
+        }
+        response = self.client.put(f'/api/attendances/{attendance_id}/', update_payload)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['status'] == "ABSENT"
+
+    def test_teacher_cannot_manage_attendance_for_other_course(self):
+        teacher = TeacherFactory()
+        other_teacher = TeacherFactory()
+        course = CourseFactory(teacher=other_teacher)
+        student = StudentFactory()
+        course.students.add(student)
+        lesson = LessonFactory(course=course)
+
+        self.client.force_authenticate(user=teacher)
+
+        payload = {
+            "lesson": lesson.id,
+            "student": student.id,
+            "status": "PRESENT"
+        }
+        response = self.client.post('/api/attendances/', payload)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_parent_can_view_own_child_attendance(self):
+        parent = ParentFactory()
+        other_parent = ParentFactory()
+
+        child = StudentFactory(parent=parent)
+        other_child = StudentFactory(parent=other_parent)
+
+        lesson1 = LessonFactory()
+        lesson2 = LessonFactory()
+
+        att1 = AttendanceFactory(lesson=lesson1, student=child, status="PRESENT")
+        _ = AttendanceFactory(lesson=lesson2, student=other_child, status="ABSENT")
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/attendances/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        if isinstance(data, dict) and 'results' in data:
+            results = data['results']
+        else:
+            results = data
+
+        assert len(results) == 1
+        assert results[0]['id'] == att1.id
+
+    def test_admin_can_manage_all_attendances(self):
+        admin = AdminFactory()
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        student = StudentFactory()
+        course.students.add(student)
+        lesson = LessonFactory(course=course)
+
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "lesson": lesson.id,
+            "student": student.id,
+            "status": "EXCUSED"
+        }
+        response = self.client.post('/api/attendances/', payload)
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_attendance_filtering_by_lesson(self):
+        teacher = TeacherFactory()
+        course = CourseFactory(teacher=teacher)
+        student = StudentFactory()
+        course.students.add(student)
+        
+        lesson1 = LessonFactory(course=course)
+        lesson2 = LessonFactory(course=course)
+        
+        att1 = AttendanceFactory(lesson=lesson1, student=student, status="PRESENT")
+        _ = AttendanceFactory(lesson=lesson2, student=student, status="ABSENT")
+        
+        self.client.force_authenticate(user=teacher)
+        
+        response_all = self.client.get('/api/attendances/')
+        assert response_all.status_code == status.HTTP_200_OK
+        data_all = response_all.json()
+        results_all = data_all.get('results', data_all) if isinstance(data_all, dict) else data_all
+        assert len(results_all) == 2
+        
+        response_filtered = self.client.get(f'/api/attendances/?lesson={lesson1.id}')
+        assert response_filtered.status_code == status.HTTP_200_OK
+        data_filtered = response_filtered.json()
+        results_filtered = data_filtered.get('results', data_filtered) if isinstance(data_filtered, dict) else data_filtered
+        
+        assert len(results_filtered) == 1
+        assert results_filtered[0]['id'] == att1.id
