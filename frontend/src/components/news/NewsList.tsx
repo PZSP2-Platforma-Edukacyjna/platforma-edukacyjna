@@ -1,8 +1,8 @@
-function MegaphoneIcon() {
+function MegaphoneIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-5 w-5"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -16,6 +16,84 @@ function MegaphoneIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect height="18" rx="2" width="18" x="3" y="4" />
+      <path d="M3 10h18" />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function BookOpenIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 7v14" />
+      <path d="M3 18a2 2 0 0 1 2-2h7V5H5a2 2 0 0 0-2 2v11Z" />
+      <path d="M21 18a2 2 0 0 0-2-2h-7V5h7a2 2 0 0 1 2 2v11Z" />
+    </svg>
+  );
+}
+
+const newsItems = [
+  {
+    title: "Nowa wycieczka szkolna",
+    description: "Zapisy dla uczniów są już dostępne.",
+    icon: <MapPinIcon />,
+    imageClass: "bg-emerald-50 text-emerald-700",
+  },
+  {
+    title: "Zebranie z rodzicami",
+    description: "Spotkanie odbędzie się w przyszłym tygodniu.",
+    icon: <CalendarIcon />,
+    imageClass: "bg-amber-50 text-amber-700",
+  },
+  {
+    title: "Nowe materiały",
+    description: "Dodano materiały do ostatnich lekcji.",
+    icon: <BookOpenIcon />,
+    imageClass: "bg-sky-50 text-sky-700",
+  },
+];
+
 export default function NewsList() {
   return (
     <div className="flex h-full gap-2">
@@ -24,10 +102,17 @@ export default function NewsList() {
       </div>
 
       <div className="card flex-1 overflow-y-auto bg-white">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="card mb-3 flex gap-2">
-            <div className="h-16 w-16 shrink-0 border bg-white"></div>
-            <div className="text-sm">Nowa wycieczka szkolna</div>
+        {newsItems.map((item) => (
+          <div key={item.title} className="card mb-3 flex gap-3">
+            <div
+              className={`flex h-16 w-16 shrink-0 items-center justify-center border ${item.imageClass}`}
+            >
+              {item.icon}
+            </div>
+            <div className="min-w-0 text-sm">
+              <div className="font-semibold">{item.title}</div>
+              <div className="mt-1 text-xs text-gray-600">{item.description}</div>
+            </div>
           </div>
         ))}
       </div>
