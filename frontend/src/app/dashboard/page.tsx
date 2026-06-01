@@ -1,5 +1,6 @@
 "use client";
 
+import AdminPanel from "@/app/admin/AdminPanel";
 import TopBar from "@/components/layout/TopBar";
 import MessagesList from "@/components/messages/MessagesList";
 import NewsList from "@/components/news/NewsList";
@@ -331,11 +332,8 @@ export default function Dashboard() {
           )}
 
           {role === "ADMIN" && (
-            <div className="card flex-[2] overflow-auto">
-              <h2 className="text-xl font-semibold">Panel administratora</h2>
-              <p className="mt-2 text-gray-600">
-                Użyj panelu administracyjnego do zarządzania szkołą.
-              </p>
+            <div className="flex-[2] overflow-auto rounded border bg-white p-4">
+              <AdminPanel />
             </div>
           )}
 
