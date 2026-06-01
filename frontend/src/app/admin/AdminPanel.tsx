@@ -5,12 +5,14 @@ import CoursesAdmin from "./CoursesAdmin";
 import LessonsAdmin from "./LessonsAdmin";
 import PaymentsAdmin from "./PaymentsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
+import StudentsAdmin from "./StudentsAdmin";
 import UsersAdmin from "./UsersAdmin";
 
-type TabId = "users" | "courses" | "lessons" | "schedule" | "payments";
+type TabId = "users" | "students" | "courses" | "lessons" | "schedule" | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
+  { id: "students", label: "Uczniowie" },
   { id: "courses", label: "Kursy" },
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
@@ -43,6 +45,7 @@ export default function AdminPanel() {
 
       <div className="min-h-0 flex-1 overflow-auto">
         {activeTab === "users" && <UsersAdmin />}
+        {activeTab === "students" && <StudentsAdmin />}
         {activeTab === "courses" && <CoursesAdmin />}
         {activeTab === "lessons" && <LessonsAdmin />}
         {activeTab === "schedule" && <ScheduleAdmin />}
