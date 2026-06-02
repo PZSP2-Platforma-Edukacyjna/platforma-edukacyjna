@@ -40,7 +40,7 @@ export default function ScheduleAdmin() {
         }),
       ]);
 
-      if (!lessonsRes.ok || !coursesRes.ok) throw new Error("Failed to fetch data");
+      if (!lessonsRes.ok || !coursesRes.ok) throw new Error("Nie udało się pobrać planu lekcji.");
 
       const lessonsData = await lessonsRes.json();
       const coursesData = await coursesRes.json();
@@ -51,7 +51,7 @@ export default function ScheduleAdmin() {
       if (e instanceof Error) {
         setError(e.message);
       } else {
-        setError("An unknown error occurred");
+        setError("Wystąpił nieznany błąd.");
       }
     } finally {
       setLoading(false);

@@ -75,7 +75,7 @@ function processSchedule(
     schedule[day][hour] = {
       id: lesson.id,
       subject: lesson.course_name,
-      teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown",
+      teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Brak danych",
       status: status,
     };
   });
@@ -171,7 +171,7 @@ export default function Dashboard() {
           ]);
 
           if (!lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
-            throw new Error("Failed to fetch teacher data");
+            throw new Error("Nie udało się pobrać danych nauczyciela.");
           }
 
           const lessonsData = (await lessonsRes.json()) as Lesson[];
@@ -192,7 +192,7 @@ export default function Dashboard() {
           if (requestError instanceof Error) {
             setError(requestError.message);
           } else {
-            setError("An unknown error occurred");
+            setError("Wystąpił nieznany błąd.");
           }
         } finally {
           setLoading(false);
@@ -223,7 +223,7 @@ export default function Dashboard() {
             ]);
 
           if (!childrenRes.ok || !lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
-            throw new Error("Failed to fetch parent data");
+            throw new Error("Nie udało się pobrać danych rodzica.");
           }
 
           const childrenData = (await childrenRes.json()) as Child[];
@@ -264,7 +264,7 @@ export default function Dashboard() {
           if (requestError instanceof Error) {
             setError(requestError.message);
           } else {
-            setError("An unknown error occurred");
+            setError("Wystąpił nieznany błąd.");
           }
         } finally {
           setLoading(false);
@@ -320,7 +320,7 @@ export default function Dashboard() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to fetch course details");
+        throw new Error("Nie udało się pobrać szczegółów kursu.");
       }
 
       const courseDetails = (await res.json()) as CourseDetailsData;
@@ -333,7 +333,7 @@ export default function Dashboard() {
       if (requestError instanceof Error) {
         setError(requestError.message);
       } else {
-        setError("An unknown error occurred");
+        setError("Wystąpił nieznany błąd.");
       }
     }
   };

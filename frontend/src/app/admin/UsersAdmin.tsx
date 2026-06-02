@@ -33,14 +33,14 @@ export default function UsersAdmin() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/manage/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to fetch users");
+      if (!res.ok) throw new Error("Nie udało się pobrać użytkowników.");
       const data = await res.json();
       setUsers(data);
     } catch (e: unknown) {
       if (e instanceof Error) {
         setError(e.message);
       } else {
-        setError("An unknown error occurred");
+        setError("Wystąpił nieznany błąd.");
       }
     } finally {
       setLoading(false);
@@ -77,9 +77,9 @@ export default function UsersAdmin() {
       fetchUsers();
     } catch (e: unknown) {
       if (e instanceof Error) {
-        alert("Error: " + e.message);
+        alert("Błąd: " + e.message);
       } else {
-        alert("An unknown error occurred");
+        alert("Wystąpił nieznany błąd.");
       }
     }
   };
@@ -117,9 +117,9 @@ export default function UsersAdmin() {
       fetchUsers();
     } catch (e: unknown) {
       if (e instanceof Error) {
-        alert("Error: " + e.message);
+        alert("Błąd: " + e.message);
       } else {
-        alert("An unknown error occurred");
+        alert("Wystąpił nieznany błąd.");
       }
     }
   };
