@@ -166,7 +166,7 @@ export default function AnnouncementsAdmin() {
             Otwórz
           </a>
         ) : (
-          "Brak"
+          "Domyślna"
         ),
     },
   ];
