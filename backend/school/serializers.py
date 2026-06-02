@@ -1,5 +1,6 @@
+from urllib.parse import urlparse
 from rest_framework import serializers
-from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance
+from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, Announcement
 
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,6 +25,23 @@ class LearningMaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningMaterial
         fields = ['id', 'course', 'course_name', 'course_code', 'title', 'description', 'url']
+
+    def validate_url(self, value):
+        host = urlparse(value).netloc.lower()
+        if host.startswith('www.'):
+            host = host[4:]
+
+        if host not in {'drive.google.com', 'docs.google.com'}:
+            raise serializers.ValidationError(
+                'Learning material URL must be a Google Drive or Google Docs link.'
+            )
+
+        return value
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = ['id', 'title', 'body', 'image_url', 'date', 'created_at']
 
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:

@@ -2,13 +2,14 @@ from rest_framework import generics, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, User
+from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, Announcement, User
 from .serializers import (
     StudentSerializer,
     LessonSerializer,
     CourseSerializer,
     CourseDetailSerializer,
     LearningMaterialSerializer,
+    AnnouncementSerializer,
     PaymentSerializer,
     PaymentStatusSerializer,
     AttendanceSerializer,
@@ -138,6 +139,30 @@ class LearningMaterialViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self.ensure_can_manage_material(self.request.user, instance.course)
+        instance.delete()
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    serializer_class = AnnouncementSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return Announcement.objects.all().order_by('-date', '-id')
+
+    def ensure_admin(self):
+        if self.request.user.role != User.Role.ADMIN:
+            raise PermissionDenied("Only administrators can manage announcements.")
+
+    def perform_create(self, serializer):
+        self.ensure_admin()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self.ensure_admin()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self.ensure_admin()
         instance.delete()
 
 class AdminStudentViewSet(viewsets.ModelViewSet):

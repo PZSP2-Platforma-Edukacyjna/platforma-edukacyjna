@@ -1,3 +1,25 @@
+"use client";
+
+import { apiGet } from "@/lib/api";
+import { ReactNode, useEffect, useState } from "react";
+
+type BackendAnnouncement = {
+  id: number;
+  title: string;
+  body: string;
+  image_url?: string;
+  date: string;
+};
+
+type NewsItem = {
+  key: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  icon: ReactNode;
+  imageClass: string;
+};
+
 function MegaphoneIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
@@ -73,28 +95,82 @@ function BookOpenIcon() {
   );
 }
 
-const newsItems = [
+const visualStyles = [
+  "bg-emerald-50 text-emerald-700",
+  "bg-amber-50 text-amber-700",
+  "bg-sky-50 text-sky-700",
+];
+
+const icons = [
+  <MapPinIcon key="map" />,
+  <CalendarIcon key="calendar" />,
+  <BookOpenIcon key="book" />,
+];
+
+const fallbackNewsItems: NewsItem[] = [
   {
+    key: "fallback-trip",
     title: "Nowa wycieczka szkolna",
     description: "Zapisy dla uczniów są już dostępne.",
-    icon: <MapPinIcon />,
-    imageClass: "bg-emerald-50 text-emerald-700",
+    icon: icons[0],
+    imageClass: visualStyles[0],
   },
   {
+    key: "fallback-meeting",
     title: "Zebranie z rodzicami",
     description: "Spotkanie odbędzie się w przyszłym tygodniu.",
-    icon: <CalendarIcon />,
-    imageClass: "bg-amber-50 text-amber-700",
+    icon: icons[1],
+    imageClass: visualStyles[1],
   },
   {
+    key: "fallback-materials",
     title: "Nowe materiały",
-    description: "Dodano materiały do ostatnich lekcji.",
-    icon: <BookOpenIcon />,
-    imageClass: "bg-sky-50 text-sky-700",
+    description: "Dodano materiały z Google Drive do ostatnich lekcji.",
+    icon: icons[2],
+    imageClass: visualStyles[2],
   },
 ];
 
+function mapAnnouncementToNewsItem(announcement: BackendAnnouncement, index: number): NewsItem {
+  const visualIndex = index % visualStyles.length;
+
+  return {
+    key: String(announcement.id),
+    title: announcement.title,
+    description: announcement.body,
+    imageUrl: announcement.image_url,
+    icon: icons[visualIndex],
+    imageClass: visualStyles[visualIndex],
+  };
+}
+
 export default function NewsList() {
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(fallbackNewsItems);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAnnouncements() {
+      try {
+        const announcements = await apiGet<BackendAnnouncement[]>("/api/announcements/");
+
+        if (isMounted && announcements.length > 0) {
+          setNewsItems(announcements.map(mapAnnouncementToNewsItem));
+        }
+      } catch {
+        if (isMounted) {
+          setNewsItems(fallbackNewsItems);
+        }
+      }
+    }
+
+    loadAnnouncements();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="flex h-full gap-2">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded border bg-white text-gray-800">
@@ -103,11 +179,19 @@ export default function NewsList() {
 
       <div className="card flex-1 overflow-y-auto bg-white">
         {newsItems.map((item) => (
-          <div key={item.title} className="card mb-3 flex gap-3">
+          <div key={item.key} className="card mb-3 flex gap-3">
             <div
-              className={`flex h-16 w-16 shrink-0 items-center justify-center border ${item.imageClass}`}
+              className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden border ${item.imageClass}`}
             >
-              {item.icon}
+              {item.imageUrl ? (
+                <div
+                  aria-hidden="true"
+                  className="h-full w-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${item.imageUrl})` }}
+                />
+              ) : (
+                item.icon
+              )}
             </div>
             <div className="min-w-0 text-sm">
               <div className="font-semibold">{item.title}</div>

@@ -11,8 +11,9 @@ from school.factories import (
     LearningMaterialFactory,
     PaymentFactory,
     AttendanceFactory,
+    AnnouncementFactory,
 )
-from school.models import Attendance, Student, Course
+from school.models import Attendance, Student, Course, Announcement
 
 pytestmark = pytest.mark.django_db
 
@@ -28,6 +29,7 @@ class TestSchoolAPI:
             '/api/teacher/schedule/',
             '/api/courses/',
             '/api/manage/students/',
+            '/api/announcements/',
         ]
         for url in urls:
             response = self.client.get(url)
@@ -226,7 +228,7 @@ class TestSchoolAPI:
                 'course': course.id,
                 'title': 'Rownania liniowe',
                 'description': 'Material do lekcji',
-                'url': 'https://example.com/material.pdf',
+                'url': 'https://drive.google.com/file/d/material-1/view?usp=sharing',
             },
             format='json',
         )
@@ -270,7 +272,7 @@ class TestSchoolAPI:
                 'course': own_course.id,
                 'title': 'Material nauczyciela',
                 'description': '',
-                'url': 'https://example.com/teacher.pdf',
+                'url': 'https://docs.google.com/document/d/material-teacher/edit',
             },
             format='json',
         )
@@ -282,7 +284,7 @@ class TestSchoolAPI:
                 'course': other_course.id,
                 'title': 'Nie moj kurs',
                 'description': '',
-                'url': 'https://example.com/blocked.pdf',
+                'url': 'https://drive.google.com/file/d/blocked/view?usp=sharing',
             },
             format='json',
         )
@@ -310,8 +312,97 @@ class TestSchoolAPI:
                 'course': own_course.id,
                 'title': 'Rodzic nie dodaje',
                 'description': '',
-                'url': 'https://example.com/parent.pdf',
+                'url': 'https://drive.google.com/file/d/parent/view?usp=sharing',
             },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_learning_material_rejects_non_google_drive_url(self):
+        admin = AdminFactory()
+        course = CourseFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': course.id,
+                'title': 'External material',
+                'description': '',
+                'url': 'https://example.com/material.pdf',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'Google Drive' in str(response.json()['url'])
+
+    def test_authenticated_users_can_view_announcements(self):
+        parent = ParentFactory()
+        older = AnnouncementFactory(title='Starsza aktualność', date=timezone.now() - timedelta(days=1))
+        newer = AnnouncementFactory(title='Nowsza aktualność')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/announcements/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [newer.id, older.id]
+
+    def test_admin_can_manage_announcements(self):
+        admin = AdminFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Dzień otwarty',
+                'body': 'Zapraszamy rodziców i uczniów.',
+                'image_url': '',
+                'date': '2026-06-01T10:00:00Z',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        announcement_id = response.json()['id']
+
+        response = self.client.patch(
+            f'/api/announcements/{announcement_id}/',
+            {'title': 'Dzień otwarty szkoły'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['title'] == 'Dzień otwarty szkoły'
+
+        response = self.client.delete(f'/api/announcements/{announcement_id}/')
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Announcement.objects.filter(id=announcement_id).exists()
+
+    def test_parent_cannot_manage_announcements(self):
+        parent = ParentFactory()
+        announcement = AnnouncementFactory()
+
+        self.client.force_authenticate(user=parent)
+
+        response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Blocked',
+                'body': 'Blocked',
+                'image_url': '',
+                'date': '2026-06-01T10:00:00Z',
+            },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        response = self.client.patch(
+            f'/api/announcements/{announcement.id}/',
+            {'title': 'Blocked'},
             format='json',
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN

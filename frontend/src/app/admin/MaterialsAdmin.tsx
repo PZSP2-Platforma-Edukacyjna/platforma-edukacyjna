@@ -256,12 +256,15 @@ export default function MaterialsAdmin() {
           <input
             type="url"
             name="url"
-            placeholder="Adres URL"
+            placeholder="Link Google Drive"
             className="border p-2 rounded"
             value={formData.url}
             onChange={handleChange}
             required
           />
+          <p className="text-xs text-gray-500">
+            Wklej link udostępniony z Google Drive albo Google Docs.
+          </p>
 
           <textarea
             name="description"

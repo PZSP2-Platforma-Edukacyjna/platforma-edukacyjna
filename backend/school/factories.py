@@ -1,7 +1,7 @@
 import factory
 from factory.django import DjangoModelFactory
 from django.utils import timezone
-from school.models import Student, Course, Lesson, LearningMaterial, Payment, Attendance
+from school.models import Student, Course, Lesson, LearningMaterial, Payment, Attendance, Announcement
 from users.factories import ParentFactory, TeacherFactory
 
 class StudentFactory(DjangoModelFactory):
@@ -37,7 +37,15 @@ class LearningMaterialFactory(DjangoModelFactory):
 
     course = factory.SubFactory(CourseFactory)
     title = factory.Faker("sentence")
-    url = factory.Faker("url")
+    url = factory.Sequence(lambda n: f"https://drive.google.com/file/d/material-{n}/view?usp=sharing")
+
+class AnnouncementFactory(DjangoModelFactory):
+    class Meta:
+        model = Announcement
+
+    title = factory.Faker("sentence")
+    body = factory.Faker("paragraph")
+    date = factory.LazyFunction(timezone.now)
 
 class PaymentFactory(DjangoModelFactory):
     class Meta:

@@ -11,6 +11,7 @@ from .views import (
     AdminLessonViewSet,
     PaymentViewSet,
     AttendanceViewSet,
+    AnnouncementViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'learning-materials', LearningMaterialViewSet, basename='learningmaterial')
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'attendances', AttendanceViewSet, basename='attendance')
+router.register(r'announcements', AnnouncementViewSet, basename='announcement')
 
 admin_router = DefaultRouter()
 admin_router.register(r'students', AdminStudentViewSet, basename='admin-student')

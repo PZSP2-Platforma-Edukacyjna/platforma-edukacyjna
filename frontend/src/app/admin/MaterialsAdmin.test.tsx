@@ -24,7 +24,7 @@ describe("MaterialsAdmin", () => {
       course_code: "MAT-1",
       title: "Algebra PDF",
       description: "Równania i funkcje",
-      url: "https://example.com/algebra.pdf",
+      url: "https://drive.google.com/file/d/algebra/view?usp=sharing",
     },
   ];
 
@@ -65,7 +65,7 @@ describe("MaterialsAdmin", () => {
     expect(within(table).getByText("Równania i funkcje")).toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Otwórz" })).toHaveAttribute(
       "href",
-      "https://example.com/algebra.pdf",
+      "https://drive.google.com/file/d/algebra/view?usp=sharing",
     );
   });
 
@@ -78,8 +78,8 @@ describe("MaterialsAdmin", () => {
     fireEvent.change(screen.getByPlaceholderText("Tytuł materiału"), {
       target: { value: "Dynamika" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Adres URL"), {
-      target: { value: "https://example.com/dynamika.pdf" },
+    fireEvent.change(screen.getByPlaceholderText("Link Google Drive"), {
+      target: { value: "https://drive.google.com/file/d/dynamika/view?usp=sharing" },
     });
     fireEvent.change(screen.getByPlaceholderText("Opis materiału"), {
       target: { value: "Zadania do lekcji" },
@@ -92,7 +92,7 @@ describe("MaterialsAdmin", () => {
         course: 102,
         title: "Dynamika",
         description: "Zadania do lekcji",
-        url: "https://example.com/dynamika.pdf",
+        url: "https://drive.google.com/file/d/dynamika/view?usp=sharing",
       });
     });
   });
@@ -113,7 +113,7 @@ describe("MaterialsAdmin", () => {
         course: 101,
         title: "Algebra rozszerzona",
         description: "Równania i funkcje",
-        url: "https://example.com/algebra.pdf",
+        url: "https://drive.google.com/file/d/algebra/view?usp=sharing",
       });
     });
 

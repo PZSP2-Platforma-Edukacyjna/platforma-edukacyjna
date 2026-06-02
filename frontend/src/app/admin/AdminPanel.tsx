@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AnnouncementsAdmin from "./AnnouncementsAdmin";
 import CoursesAdmin from "./CoursesAdmin";
 import LessonsAdmin from "./LessonsAdmin";
 import MaterialsAdmin from "./MaterialsAdmin";
@@ -9,7 +10,15 @@ import ScheduleAdmin from "./ScheduleAdmin";
 import StudentsAdmin from "./StudentsAdmin";
 import UsersAdmin from "./UsersAdmin";
 
-type TabId = "users" | "students" | "courses" | "lessons" | "schedule" | "materials" | "payments";
+type TabId =
+  | "users"
+  | "students"
+  | "courses"
+  | "lessons"
+  | "schedule"
+  | "materials"
+  | "announcements"
+  | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
@@ -18,6 +27,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
   { id: "materials", label: "Materiały" },
+  { id: "announcements", label: "Aktualności" },
   { id: "payments", label: "Płatności" },
 ];
 
@@ -52,6 +62,7 @@ export default function AdminPanel() {
         {activeTab === "lessons" && <LessonsAdmin />}
         {activeTab === "schedule" && <ScheduleAdmin />}
         {activeTab === "materials" && <MaterialsAdmin />}
+        {activeTab === "announcements" && <AnnouncementsAdmin />}
         {activeTab === "payments" && <PaymentsAdmin />}
       </div>
     </section>
