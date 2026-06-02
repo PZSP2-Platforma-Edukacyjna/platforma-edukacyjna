@@ -43,7 +43,7 @@ export default function LessonsAdmin() {
         }),
       ]);
 
-      if (!lessonsRes.ok || !coursesRes.ok) throw new Error("Failed to fetch data");
+      if (!lessonsRes.ok || !coursesRes.ok) throw new Error("Nie udało się pobrać lekcji.");
 
       const lessonsData = await lessonsRes.json();
       const coursesData = await coursesRes.json();
@@ -54,7 +54,7 @@ export default function LessonsAdmin() {
       if (e instanceof Error) {
         setError(e.message);
       } else {
-        setError("An unknown error occurred");
+        setError("Wystąpił nieznany błąd.");
       }
     } finally {
       setLoading(false);
@@ -94,9 +94,9 @@ export default function LessonsAdmin() {
       fetchData();
     } catch (e: unknown) {
       if (e instanceof Error) {
-        alert("Error: " + e.message);
+        alert("Błąd: " + e.message);
       } else {
-        alert("An unknown error occurred");
+        alert("Wystąpił nieznany błąd.");
       }
     }
   };
@@ -138,9 +138,9 @@ export default function LessonsAdmin() {
       fetchData();
     } catch (e: unknown) {
       if (e instanceof Error) {
-        alert("Error: " + e.message);
+        alert("Błąd: " + e.message);
       } else {
-        alert("An unknown error occurred");
+        alert("Wystąpił nieznany błąd.");
       }
     }
   };

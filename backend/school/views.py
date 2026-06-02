@@ -1,13 +1,17 @@
 from rest_framework import generics, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
-from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, User
+from rest_framework.response import Response
+from .models import Student, Lesson, Course, LearningMaterial, Payment, Attendance, Announcement, User
 from .serializers import (
     StudentSerializer,
     LessonSerializer,
     CourseSerializer,
     CourseDetailSerializer,
     LearningMaterialSerializer,
+    AnnouncementSerializer,
     PaymentSerializer,
+    PaymentStatusSerializer,
     AttendanceSerializer,
 )
 from .permissions import IsParent, IsAdmin, IsTeacher
@@ -83,15 +87,97 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == User.Role.ADMIN:
+            return Course.objects.all()
+
+        if user.role == User.Role.TEACHER:
+            return Course.objects.filter(teacher=user)
+
+        if user.role == User.Role.PARENT:
+            return Course.objects.filter(students__parent=user).distinct()
+
+        return Course.objects.none()
+
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return CourseDetailSerializer
         return CourseSerializer
 
 class LearningMaterialViewSet(viewsets.ModelViewSet):
-    queryset = LearningMaterial.objects.all()
     serializer_class = LearningMaterialSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == User.Role.ADMIN:
+            return LearningMaterial.objects.all().order_by('course__name', 'title')
+
+        if user.role == User.Role.TEACHER:
+            return LearningMaterial.objects.filter(course__teacher=user).order_by(
+                'course__name',
+                'title',
+            )
+
+        if user.role == User.Role.PARENT:
+            return (
+                LearningMaterial.objects
+                .filter(course__students__parent=user)
+                .order_by('course__name', 'title')
+                .distinct()
+            )
+
+        return LearningMaterial.objects.none()
+
+    def ensure_can_manage_material(self, user, course):
+        if user.role == User.Role.ADMIN:
+            return
+
+        if user.role == User.Role.TEACHER and course.teacher_id == user.id:
+            return
+
+        raise PermissionDenied("You do not have permission to manage materials for this course.")
+
+    def perform_create(self, serializer):
+        course = serializer.validated_data['course']
+        self.ensure_can_manage_material(self.request.user, course)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        course = serializer.validated_data.get('course', serializer.instance.course)
+        self.ensure_can_manage_material(self.request.user, course)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self.ensure_can_manage_material(self.request.user, instance.course)
+        instance.delete()
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    serializer_class = AnnouncementSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return Announcement.objects.all().order_by('-date', '-id')
+
+    def ensure_admin(self):
+        if self.request.user.role != User.Role.ADMIN:
+            raise PermissionDenied("Only administrators can manage announcements.")
+
+    def perform_create(self, serializer):
+        self.ensure_admin()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self.ensure_admin()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self.ensure_admin()
+        instance.delete()
 
 class AdminStudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
@@ -123,12 +209,24 @@ class TeacherScheduleView(generics.ListAPIView):
             .distinct()
         )
 
-class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
+class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
+    http_method_names = ['get', 'patch', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
         if user.role == User.Role.ADMIN:
             return Payment.objects.all().order_by('-date')
         return Payment.objects.filter(user=user).order_by('-date')
+
+    def partial_update(self, request, *args, **kwargs):
+        if request.user.role != User.Role.ADMIN:
+            raise PermissionDenied("Only administrators can update payment status.")
+
+        payment = self.get_object()
+        serializer = PaymentStatusSerializer(payment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(PaymentSerializer(payment, context=self.get_serializer_context()).data)

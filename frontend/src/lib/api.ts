@@ -66,3 +66,58 @@ export async function apiPost<TResponse, TBody>(path: string, body: TBody): Prom
 
   return response.json();
 }
+
+export async function apiPatch<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
+  const backendUrl = getBackendUrl();
+
+  if (!backendUrl) {
+    throw new ApiError("Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.");
+  }
+
+  const token = getAccessToken();
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${backendUrl}${path}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new ApiError(`Błąd zapisu danych: ${response.status} ${errorText}`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const backendUrl = getBackendUrl();
+
+  if (!backendUrl) {
+    throw new ApiError("Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.");
+  }
+
+  const token = getAccessToken();
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${backendUrl}${path}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new ApiError(`Błąd usuwania danych: ${response.status} ${errorText}`, response.status);
+  }
+}

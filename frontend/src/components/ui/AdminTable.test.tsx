@@ -34,6 +34,20 @@ describe("AdminTable", () => {
     expect(screen.getByText("Item 2")).toBeInTheDocument();
   });
 
+  it("renders an empty state when there is no data", () => {
+    render(
+      <AdminTable
+        title="Empty Table"
+        data={[]}
+        columns={columns}
+        keyExtractor={(item) => item.id}
+      />,
+    );
+
+    expect(screen.getByText("Empty Table")).toBeInTheDocument();
+    expect(screen.getByText("Brak danych do wyświetlenia.")).toBeInTheDocument();
+  });
+
   it("calls onEdit when edit button is clicked", () => {
     const onEdit = vi.fn();
     render(

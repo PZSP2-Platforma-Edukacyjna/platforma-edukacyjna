@@ -1,19 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import AnnouncementsAdmin from "./AnnouncementsAdmin";
 import CoursesAdmin from "./CoursesAdmin";
 import LessonsAdmin from "./LessonsAdmin";
+import MaterialsAdmin from "./MaterialsAdmin";
 import PaymentsAdmin from "./PaymentsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
+import StudentsAdmin from "./StudentsAdmin";
 import UsersAdmin from "./UsersAdmin";
 
-type TabId = "users" | "courses" | "lessons" | "schedule" | "payments";
+type TabId =
+  | "users"
+  | "students"
+  | "courses"
+  | "lessons"
+  | "schedule"
+  | "materials"
+  | "announcements"
+  | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
+  { id: "students", label: "Uczniowie" },
   { id: "courses", label: "Kursy" },
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
+  { id: "materials", label: "Materiały" },
+  { id: "announcements", label: "Aktualności" },
   { id: "payments", label: "Płatności" },
 ];
 
@@ -43,9 +57,12 @@ export default function AdminPanel() {
 
       <div className="min-h-0 flex-1 overflow-auto">
         {activeTab === "users" && <UsersAdmin />}
+        {activeTab === "students" && <StudentsAdmin />}
         {activeTab === "courses" && <CoursesAdmin />}
         {activeTab === "lessons" && <LessonsAdmin />}
         {activeTab === "schedule" && <ScheduleAdmin />}
+        {activeTab === "materials" && <MaterialsAdmin />}
+        {activeTab === "announcements" && <AnnouncementsAdmin />}
         {activeTab === "payments" && <PaymentsAdmin />}
       </div>
     </section>

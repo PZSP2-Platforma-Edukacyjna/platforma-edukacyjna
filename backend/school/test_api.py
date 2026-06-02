@@ -4,8 +4,16 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.factories import ParentFactory, TeacherFactory, AdminFactory
-from school.factories import StudentFactory, CourseFactory, LessonFactory, LearningMaterialFactory, AttendanceFactory
-from school.models import Attendance, Student, Course
+from school.factories import (
+    StudentFactory,
+    CourseFactory,
+    LessonFactory,
+    LearningMaterialFactory,
+    PaymentFactory,
+    AttendanceFactory,
+    AnnouncementFactory,
+)
+from school.models import Attendance, Student, Course, Announcement
 
 pytestmark = pytest.mark.django_db
 
@@ -21,6 +29,7 @@ class TestSchoolAPI:
             '/api/teacher/schedule/',
             '/api/courses/',
             '/api/manage/students/',
+            '/api/announcements/',
         ]
         for url in urls:
             response = self.client.get(url)
@@ -112,6 +121,32 @@ class TestSchoolAPI:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert [item['id'] for item in data] == [lesson.id]
+
+    def test_course_list_is_filtered_by_role(self):
+        parent = ParentFactory()
+        teacher = TeacherFactory()
+        other_teacher = TeacherFactory()
+        child = StudentFactory(parent=parent)
+        own_course = CourseFactory(teacher=teacher)
+        other_course = CourseFactory(teacher=other_teacher)
+        parent_course = CourseFactory()
+        parent_course.students.add(child)
+
+        self.client.force_authenticate(user=teacher)
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        assert [item['id'] for item in response.json()] == [own_course.id]
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        assert [item['id'] for item in response.json()] == [parent_course.id]
+
+        self.client.force_authenticate(user=AdminFactory())
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        course_ids = {item['id'] for item in response.json()}
+        assert {own_course.id, other_course.id, parent_course.id}.issubset(course_ids)
 
     def test_teacher_schedule_is_sorted_by_date(self):
         teacher = TeacherFactory()
@@ -207,7 +242,244 @@ class TestSchoolAPI:
         assert len(data['learning_materials']) == 1
         assert data['learning_materials'][0]['id'] == material.id
 
-    def test_teacher_course_detail_only_includes_students_for_own_course(self):
+    def test_admin_can_manage_learning_materials(self):
+        admin = AdminFactory()
+        course = CourseFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': course.id,
+                'title': 'Rownania liniowe',
+                'description': 'Material do lekcji',
+                'url': 'https://drive.google.com/file/d/material-1/view?usp=sharing',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        material_id = response.json()['id']
+        assert response.json()['course'] == course.id
+        assert response.json()['course_name'] == course.name
+        assert response.json()['course_code'] == course.course_code
+
+        response = self.client.patch(
+            f'/api/learning-materials/{material_id}/',
+            {'title': 'Rownania kwadratowe'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['title'] == 'Rownania kwadratowe'
+
+        response = self.client.delete(f'/api/learning-materials/{material_id}/')
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_teacher_can_manage_only_own_learning_materials(self):
+        teacher = TeacherFactory()
+        other_teacher = TeacherFactory()
+        own_course = CourseFactory(teacher=teacher)
+        other_course = CourseFactory(teacher=other_teacher)
+        own_material = LearningMaterialFactory(course=own_course)
+        LearningMaterialFactory(course=other_course)
+
+        self.client.force_authenticate(user=teacher)
+
+        response = self.client.get('/api/learning-materials/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [own_material.id]
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': own_course.id,
+                'title': 'Material nauczyciela',
+                'description': '',
+                'url': 'https://docs.google.com/document/d/material-teacher/edit',
+            },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': other_course.id,
+                'title': 'Nie moj kurs',
+                'description': '',
+                'url': 'https://drive.google.com/file/d/blocked/view?usp=sharing',
+            },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_parent_can_view_only_child_course_learning_materials(self):
+        parent = ParentFactory()
+        child = StudentFactory(parent=parent)
+        own_course = CourseFactory()
+        other_course = CourseFactory()
+        own_course.students.add(child)
+        own_material = LearningMaterialFactory(course=own_course)
+        LearningMaterialFactory(course=other_course)
+
+        self.client.force_authenticate(user=parent)
+
+        response = self.client.get('/api/learning-materials/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [own_material.id]
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': own_course.id,
+                'title': 'Rodzic nie dodaje',
+                'description': '',
+                'url': 'https://drive.google.com/file/d/parent/view?usp=sharing',
+            },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_learning_material_rejects_non_google_drive_url(self):
+        admin = AdminFactory()
+        course = CourseFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/learning-materials/',
+            {
+                'course': course.id,
+                'title': 'External material',
+                'description': '',
+                'url': 'https://example.com/material.pdf',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'Google Drive' in str(response.json()['url'])
+
+    def test_authenticated_users_can_view_announcements(self):
+        parent = ParentFactory()
+        older = AnnouncementFactory(title='Starsza aktualność', date=timezone.now() - timedelta(days=1))
+        newer = AnnouncementFactory(title='Nowsza aktualność')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/announcements/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert [item['id'] for item in data] == [newer.id, older.id]
+
+    def test_admin_can_manage_announcements(self):
+        admin = AdminFactory()
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Dzień otwarty',
+                'body': 'Zapraszamy rodziców i uczniów.',
+                'image_url': '',
+                'date': '2026-06-01T10:00:00Z',
+            },
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        announcement_id = response.json()['id']
+
+        response = self.client.patch(
+            f'/api/announcements/{announcement_id}/',
+            {'title': 'Dzień otwarty szkoły'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['title'] == 'Dzień otwarty szkoły'
+
+        response = self.client.delete(f'/api/announcements/{announcement_id}/')
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Announcement.objects.filter(id=announcement_id).exists()
+
+    def test_parent_cannot_manage_announcements(self):
+        parent = ParentFactory()
+        announcement = AnnouncementFactory()
+
+        self.client.force_authenticate(user=parent)
+
+        response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Blocked',
+                'body': 'Blocked',
+                'image_url': '',
+                'date': '2026-06-01T10:00:00Z',
+            },
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        response = self.client.patch(
+            f'/api/announcements/{announcement.id}/',
+            {'title': 'Blocked'},
+            format='json',
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_parent_can_view_only_own_payments(self):
+        parent = ParentFactory()
+        other_parent = ParentFactory()
+        own_payment = PaymentFactory(user=parent)
+        PaymentFactory(user=other_parent)
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/payments/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == own_payment.id
+        assert data[0]['user_email'] == parent.email
+
+    def test_admin_can_update_payment_status(self):
+        admin = AdminFactory()
+        payment = PaymentFactory(status='PENDING')
+
+        self.client.force_authenticate(user=admin)
+        response = self.client.patch(
+            f'/api/payments/{payment.id}/',
+            {'status': 'COMPLETED'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        payment.refresh_from_db()
+        assert payment.status == 'COMPLETED'
+        assert response.json()['status'] == 'COMPLETED'
+
+    def test_parent_cannot_update_payment_status(self):
+        parent = ParentFactory()
+        payment = PaymentFactory(user=parent, status='PENDING')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.patch(
+            f'/api/payments/{payment.id}/',
+            {'status': 'COMPLETED'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        payment.refresh_from_db()
+        assert payment.status == 'PENDING'
+
+    def test_teacher_course_detail_only_allows_own_course(self):
         teacher = TeacherFactory()
         other_teacher = TeacherFactory()
         own_course = CourseFactory(teacher=teacher)
@@ -225,9 +497,7 @@ class TestSchoolAPI:
         assert [student['id'] for student in own_data['students']] == [own_student.id]
 
         other_response = self.client.get(f'/api/courses/{other_course.id}/')
-        assert other_response.status_code == status.HTTP_200_OK
-        other_data = other_response.json()
-        assert other_data['students'] == []
+        assert other_response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_teacher_can_manage_attendance_for_own_course(self):
         teacher = TeacherFactory()

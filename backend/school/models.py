@@ -39,6 +39,16 @@ class LearningMaterial(models.Model):
     def __str__(self) -> str:
         return str(self.title)
 
+class Announcement(models.Model):
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    image_url = models.URLField(blank=True)
+    date = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return str(self.title)
+
 class Payment(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Oczekująca'

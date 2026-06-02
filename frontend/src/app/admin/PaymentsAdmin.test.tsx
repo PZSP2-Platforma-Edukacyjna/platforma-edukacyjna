@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PaymentsAdmin from "./PaymentsAdmin";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   apiGet: vi.fn(),
+  apiPatch: vi.fn(),
 }));
 
 describe("PaymentsAdmin", () => {
@@ -44,6 +45,15 @@ describe("PaymentsAdmin", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiGet).mockResolvedValue(payments);
+    vi.mocked(apiPatch).mockImplementation((path, body) => {
+      const paymentId = Number(String(path).match(/payments\/(\d+)\//)?.[1]);
+      const payment = payments.find((item) => item.id === paymentId);
+
+      return Promise.resolve({
+        ...payment,
+        ...(body as object),
+      });
+    });
   });
 
   it("loads admin payments from backend and renders summary", async () => {
@@ -56,9 +66,9 @@ describe("PaymentsAdmin", () => {
     expect(screen.getByText("parent@example.com")).toBeInTheDocument();
     expect(screen.getByText("Anna Nowak")).toBeInTheDocument();
     expect(screen.getByText("Matematyka")).toBeInTheDocument();
-    expect(screen.getByText("Oczekująca")).toBeInTheDocument();
-    expect(screen.getByText("Zakończona")).toBeInTheDocument();
-    expect(screen.getByText("Nieudana")).toBeInTheDocument();
+    expect(screen.getAllByText("Oczekująca").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Zakończona").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Nieudana").length).toBeGreaterThan(0);
   });
 
   it("filters payments by status, course and search phrase", async () => {
@@ -96,5 +106,23 @@ describe("PaymentsAdmin", () => {
 
     expect(await screen.findByText("Backend niedostępny")).toBeInTheDocument();
     expect(screen.getByText("Brak płatności do wyświetlenia.")).toBeInTheDocument();
+  });
+
+  it("allows changing payment status", async () => {
+    render(<PaymentsAdmin />);
+
+    await screen.findByText("Matematyka");
+
+    fireEvent.change(screen.getByLabelText("Zmień status płatności #1"), {
+      target: { value: "COMPLETED" },
+    });
+
+    expect(apiPatch).toHaveBeenCalledWith("/api/payments/1/", {
+      status: "COMPLETED",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Zmień status płatności #1")).toHaveValue("COMPLETED");
+    });
   });
 });
