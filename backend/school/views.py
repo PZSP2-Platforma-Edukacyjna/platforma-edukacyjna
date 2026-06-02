@@ -87,6 +87,20 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == User.Role.ADMIN:
+            return Course.objects.all()
+
+        if user.role == User.Role.TEACHER:
+            return Course.objects.filter(teacher=user)
+
+        if user.role == User.Role.PARENT:
+            return Course.objects.filter(students__parent=user).distinct()
+
+        return Course.objects.none()
+
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return CourseDetailSerializer

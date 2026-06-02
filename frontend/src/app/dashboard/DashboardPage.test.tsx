@@ -115,4 +115,49 @@ describe("Dashboard Page - Parent Attendance", () => {
     expect(screen.getAllByText("Matematyka").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Failed to fetch parent data/)).not.toBeInTheDocument();
   });
+
+  it("shows the teacher materials panel with teacher courses", async () => {
+    vi.mocked(auth.getUserRole).mockReturnValue("TEACHER");
+    process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000";
+
+    const mockLessons = [
+      { id: 100, course: 10, course_name: "Matematyka", date: "2026-06-01T10:00:00Z", teacher: 2 },
+    ];
+    const mockTeachers = [{ id: 2, first_name: "Anna", last_name: "Nowak" }];
+    const mockCourses = [
+      { id: 10, course_code: "MAT-1", name: "Matematyka", description: "", teacher: 2 },
+    ];
+    const mockMaterials = [
+      {
+        id: 1,
+        course: 10,
+        course_name: "Matematyka",
+        course_code: "MAT-1",
+        title: "Algebra PDF",
+        description: "Równania",
+        url: "https://drive.google.com/file/d/algebra/view?usp=sharing",
+      },
+    ];
+
+    vi.mocked(global.fetch).mockImplementation((url) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/api/teacher/schedule/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockLessons) } as Response);
+      if (urlStr.includes("/api/users/teachers/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTeachers) } as Response);
+      if (urlStr.includes("/api/courses/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCourses) } as Response);
+      if (urlStr.includes("/api/learning-materials/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMaterials) } as Response);
+      if (urlStr.includes("/api/announcements/"))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      return Promise.reject(new Error(`Unknown URL: ${urlStr}`));
+    });
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Moje materiały")).toBeInTheDocument();
+    expect(await screen.findByText("Algebra PDF")).toBeInTheDocument();
+    expect(screen.getByText("Plan lekcji nauczyciela")).toBeInTheDocument();
+  });
 });

@@ -7,6 +7,7 @@ import NewsList from "@/components/news/NewsList";
 import ScheduleGrid, { Schedule } from "@/components/schedule/ScheduleGrid";
 import CourseDetails from "@/components/subjects/CourseDetails";
 import SubjectsList from "@/components/subjects/SubjectsList";
+import TeacherMaterialsPanel from "@/components/subjects/TeacherMaterialsPanel";
 import AttendanceModal from "@/components/schedule/AttendanceModal";
 import { getAccessToken, getUserRole } from "@/lib/auth";
 import type { Attendance, Child, Lesson, Teacher } from "@/types/school";
@@ -157,21 +158,25 @@ export default function Dashboard() {
 
       if (currentRole === "TEACHER") {
         try {
-          const [lessonsRes, teachersRes] = await Promise.all([
+          const [lessonsRes, teachersRes, coursesRes] = await Promise.all([
             fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/teacher/schedule/`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
             fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/teachers/`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
+            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/courses/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
 
-          if (!lessonsRes.ok || !teachersRes.ok) {
+          if (!lessonsRes.ok || !teachersRes.ok || !coursesRes.ok) {
             throw new Error("Failed to fetch teacher data");
           }
 
           const lessonsData = (await lessonsRes.json()) as Lesson[];
           const teachersData = (await teachersRes.json()) as Teacher[];
+          const coursesData = (await coursesRes.json()) as CourseListItem[];
 
           const teacherCourseIds = Array.from(new Set(lessonsData.map((lesson) => lesson.course)));
 
@@ -179,7 +184,7 @@ export default function Dashboard() {
           setSelectedChild(null);
           setLessons(lessonsData);
           setTeachers(teachersData);
-          setCourses([]);
+          setCourses(coursesData);
           setSelectedChildCourses([]);
           setAttendances([]);
           setSchedule(processSchedule(lessonsData, teacherCourseIds, teachersData));
@@ -423,6 +428,12 @@ export default function Dashboard() {
               teachers={teachers}
               onCourseClick={handleCourseClick}
             />
+          </div>
+        )}
+
+        {role === "TEACHER" && !loading && !error && (
+          <div className="flex-[1.2] max-w-[28%]">
+            <TeacherMaterialsPanel courses={courses} />
           </div>
         )}
 

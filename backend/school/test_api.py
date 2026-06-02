@@ -122,6 +122,32 @@ class TestSchoolAPI:
         data = response.json()
         assert [item['id'] for item in data] == [lesson.id]
 
+    def test_course_list_is_filtered_by_role(self):
+        parent = ParentFactory()
+        teacher = TeacherFactory()
+        other_teacher = TeacherFactory()
+        child = StudentFactory(parent=parent)
+        own_course = CourseFactory(teacher=teacher)
+        other_course = CourseFactory(teacher=other_teacher)
+        parent_course = CourseFactory()
+        parent_course.students.add(child)
+
+        self.client.force_authenticate(user=teacher)
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        assert [item['id'] for item in response.json()] == [own_course.id]
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        assert [item['id'] for item in response.json()] == [parent_course.id]
+
+        self.client.force_authenticate(user=AdminFactory())
+        response = self.client.get('/api/courses/')
+        assert response.status_code == status.HTTP_200_OK
+        course_ids = {item['id'] for item in response.json()}
+        assert {own_course.id, other_course.id, parent_course.id}.issubset(course_ids)
+
     def test_teacher_schedule_is_sorted_by_date(self):
         teacher = TeacherFactory()
         course = CourseFactory(teacher=teacher)
@@ -453,7 +479,7 @@ class TestSchoolAPI:
         payment.refresh_from_db()
         assert payment.status == 'PENDING'
 
-    def test_teacher_course_detail_only_includes_students_for_own_course(self):
+    def test_teacher_course_detail_only_allows_own_course(self):
         teacher = TeacherFactory()
         other_teacher = TeacherFactory()
         own_course = CourseFactory(teacher=teacher)
@@ -471,9 +497,7 @@ class TestSchoolAPI:
         assert [student['id'] for student in own_data['students']] == [own_student.id]
 
         other_response = self.client.get(f'/api/courses/{other_course.id}/')
-        assert other_response.status_code == status.HTTP_200_OK
-        other_data = other_response.json()
-        assert other_data['students'] == []
+        assert other_response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_teacher_can_manage_attendance_for_own_course(self):
         teacher = TeacherFactory()
