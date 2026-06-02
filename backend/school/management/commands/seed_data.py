@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth.models import Group
 from users.models import User
-from school.models import Student, Course, Lesson, LearningMaterial, Payment
+from school.models import Student, Course, Lesson, LearningMaterial, Payment, Attendance
 
 class Command(BaseCommand):
     help = 'Seeds the database with a larger set of initial data'
@@ -21,6 +21,7 @@ class Command(BaseCommand):
         Lesson.objects.all().delete()
         LearningMaterial.objects.all().delete()
         Payment.objects.all().delete()
+        Attendance.objects.all().delete()
 
         self.stdout.write('Creating new data...')
 
@@ -155,6 +156,20 @@ class Command(BaseCommand):
                 )
         self.stdout.write('Successfully seeded payments data.')
 
-        self.stdout.write(self.style.SUCCESS('Successfully seeded database with a larger dataset.'))
+        self.stdout.write('Creating attendances...')
+        all_lessons = list(Lesson.objects.select_related('course').prefetch_related('course__students').all())
+        for lesson in all_lessons:
+            for student in lesson.course.students.all():
+                status = random.choices(
+                    [Attendance.Status.PRESENT, Attendance.Status.ABSENT, Attendance.Status.EXCUSED, Attendance.Status.LATE],
+                    weights=[0.8, 0.05, 0.1, 0.05],
+                    k=1
+                )[0]
+                Attendance.objects.create(
+                    lesson=lesson,
+                    student=student,
+                    status=status
+                )
+        self.stdout.write('Successfully seeded attendances data.')
 
         self.stdout.write(self.style.SUCCESS('Successfully seeded database with a larger dataset.'))

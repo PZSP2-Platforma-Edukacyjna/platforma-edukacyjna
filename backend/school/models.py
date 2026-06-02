@@ -65,3 +65,21 @@ class Payment(models.Model):
 
     def __str__(self) -> str:
         return f'Płatność {self.id} - {self.user.email} - {self.course.name} ({self.amount} PLN)'
+
+class Attendance(models.Model):
+    class Status(models.TextChoices):
+        PRESENT = 'PRESENT', 'Present'
+        ABSENT = 'ABSENT', 'Absent'
+        EXCUSED = 'EXCUSED', 'Excused'
+        LATE = 'LATE', 'Late'
+
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='attendances')
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='attendances')
+    status = models.CharField(max_length=20, choices=Status.choices)
+    date_marked = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('lesson', 'student')
+
+    def __str__(self):
+        return f'{self.student} - {self.lesson} - {self.status}'

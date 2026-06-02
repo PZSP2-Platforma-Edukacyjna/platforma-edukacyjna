@@ -3,12 +3,13 @@
 import { useState } from "react";
 import CoursesAdmin from "./CoursesAdmin";
 import LessonsAdmin from "./LessonsAdmin";
+import MaterialsAdmin from "./MaterialsAdmin";
 import PaymentsAdmin from "./PaymentsAdmin";
 import ScheduleAdmin from "./ScheduleAdmin";
 import StudentsAdmin from "./StudentsAdmin";
 import UsersAdmin from "./UsersAdmin";
 
-type TabId = "users" | "students" | "courses" | "lessons" | "schedule" | "payments";
+type TabId = "users" | "students" | "courses" | "lessons" | "schedule" | "materials" | "payments";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "users", label: "Użytkownicy" },
@@ -16,6 +17,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "courses", label: "Kursy" },
   { id: "lessons", label: "Lekcje (Lista)" },
   { id: "schedule", label: "Plan Lekcji" },
+  { id: "materials", label: "Materiały" },
   { id: "payments", label: "Płatności" },
 ];
 
@@ -49,6 +51,7 @@ export default function AdminPanel() {
         {activeTab === "courses" && <CoursesAdmin />}
         {activeTab === "lessons" && <LessonsAdmin />}
         {activeTab === "schedule" && <ScheduleAdmin />}
+        {activeTab === "materials" && <MaterialsAdmin />}
         {activeTab === "payments" && <PaymentsAdmin />}
       </div>
     </section>

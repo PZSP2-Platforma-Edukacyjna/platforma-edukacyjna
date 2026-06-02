@@ -1,7 +1,7 @@
 import factory
 from factory.django import DjangoModelFactory
 from django.utils import timezone
-from school.models import Student, Course, Lesson, LearningMaterial, Payment
+from school.models import Student, Course, Lesson, LearningMaterial, Payment, Attendance
 from users.factories import ParentFactory, TeacherFactory
 
 class StudentFactory(DjangoModelFactory):
@@ -47,3 +47,11 @@ class PaymentFactory(DjangoModelFactory):
     course = factory.SubFactory(CourseFactory)
     amount = "199.99"
     status = Payment.Status.PENDING
+
+class AttendanceFactory(DjangoModelFactory):
+    class Meta:
+        model = Attendance
+
+    lesson = factory.SubFactory(LessonFactory)
+    student = factory.SubFactory(StudentFactory)
+    status = Attendance.Status.PRESENT

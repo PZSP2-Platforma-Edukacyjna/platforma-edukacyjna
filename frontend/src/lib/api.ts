@@ -96,3 +96,28 @@ export async function apiPatch<TResponse, TBody>(path: string, body: TBody): Pro
 
   return response.json();
 }
+
+export async function apiDelete(path: string): Promise<void> {
+  const backendUrl = getBackendUrl();
+
+  if (!backendUrl) {
+    throw new ApiError("Brak adresu backendu w NEXT_PUBLIC_BACKEND_URL.");
+  }
+
+  const token = getAccessToken();
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${backendUrl}${path}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new ApiError(`Błąd usuwania danych: ${response.status} ${errorText}`, response.status);
+  }
+}

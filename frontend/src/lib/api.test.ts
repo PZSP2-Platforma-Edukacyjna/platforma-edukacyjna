@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiGet, apiPatch, apiPost, ApiError } from "./api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "./api";
 import { getAccessToken } from "@/lib/auth";
 
 vi.mock("@/lib/auth", () => ({
@@ -123,6 +123,25 @@ describe("api helpers", () => {
 
     const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Headers;
     expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("Authorization")).toBe("Bearer access-token");
+  });
+
+  it("apiDelete sends authorization header without a body", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+    });
+
+    await expect(apiDelete("/api/learning-materials/7/")).resolves.toBeUndefined();
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/api/learning-materials/7/",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.any(Headers),
+      }),
+    );
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Headers;
     expect(headers.get("Authorization")).toBe("Bearer access-token");
   });
 });
